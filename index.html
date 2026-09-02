@@ -1526,12 +1526,12 @@ function renderTabPlan(plan,c){
   });
 
   c.innerHTML=`<div class="import-box">
-    <h3>Import from screenshot</h3>
-    <p class="import-desc">Upload a screenshot from Strava, Garmin, Polar, or similar — we'll find your activities automatically.</p>
+    <h3>Importér fra screenshot</h3>
+    <p class="import-desc">Upload et screenshot fra Strava, Garmin, Polar eller lignende — vi finder dine aktiviteter automatisk.</p>
     <div id="importArea"><div class="upload-area" id="uploadDropzone">
-      <label class="upload-label" for="screenshotInput">Choose image</label>
+      <label class="upload-label" for="screenshotInput">Vælg billede</label>
       <input type="file" id="screenshotInput" accept="image/*" style="display:none;">
-      <div class="upload-hint">PNG, JPG or WebP · Strava, Garmin, Polar and more</div>
+      <div class="upload-hint">PNG, JPG eller WebP · Strava, Garmin, Polar og mere</div>
     </div></div>
   </div>
   <div class="weeks-wrap">${weeksHtml}</div>`;
@@ -1704,9 +1704,9 @@ async function handleScreenshot(file){
 function resetUploadHtml(err){
   return`${err?`<div class="import-status" style="color:var(--red);margin-bottom:10px;">${err}</div>`:""}
     <div class="upload-area" id="uploadDropzone">
-      <label class="upload-label" for="screenshotInput">Choose image</label>
+      <label class="upload-label" for="screenshotInput">Vælg billede</label>
       <input type="file" id="screenshotInput" accept="image/*" style="display:none;">
-      <div class="upload-hint">PNG, JPG or WebP · Strava, Garmin, Polar and more</div>
+      <div class="upload-hint">PNG, JPG eller WebP · Strava, Garmin, Polar og mere</div>
     </div>`;
 }
 function wireUploadArea(){
