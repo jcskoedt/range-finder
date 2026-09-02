@@ -1212,6 +1212,7 @@ function renderTabContent(){
   const plan=state.activePlan;
   const c=document.getElementById("tabContent");
   if(!c)return;
+  window.scrollTo(0,0);
   document.querySelectorAll(".plan-tab").forEach(btn=>{
     btn.classList.toggle("active",btn.dataset.tab===planTab);
   });
