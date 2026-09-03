@@ -1292,7 +1292,11 @@ function renderTabToday(plan,c){
           <input id="todayActKm" type="number" inputmode="numeric" value="${prog.actualKm!=null?prog.actualKm:km}" style="width:60px;font-family:'Turret Road',sans-serif;font-size:14px;font-weight:700;border:none;border-bottom:2px solid rgba(255,255,255,0.4);background:transparent;color:#fff;padding:2px 0;">
           <span style="font-size:12px;color:rgba(255,255,255,0.6);">/ ${km} km planlagt</span>
         </div>
-        <button class="btn btn-outline" id="todayMoveBtn" style="margin-top:12px;font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);">Flyt træning</button>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-outline" id="todayMoveBtn" style="font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);">Flyt træning</button>
+          <button class="btn btn-outline" id="todayUndoBtn" style="font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.45);">Fortryd</button>
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.4);">${fmtDate(selDate)}</div>
       </div>`;
     } else {
       cardHtml=`<div class="today-card">
@@ -1378,6 +1382,8 @@ function renderTabToday(plan,c){
     const[,km]=ts.item;const ikey=keyFor(ts.wIdx,ts.sIdx);
     const lb=document.getElementById("todayLogBtn");
     if(lb)lb.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=true;if(!cur.actualKm)cur.actualKm=km;plan.progress[ikey]=cur;await savePlan(plan);renderTabToday(plan,c);};
+    const ub=document.getElementById("todayUndoBtn");
+    if(ub)ub.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=false;plan.progress[ikey]=cur;await savePlan(plan);renderTabToday(plan,c);};
     const kmI=document.getElementById("todayActKm");
     if(kmI){kmI.onclick=(e)=>e.stopPropagation();kmI.onchange=async(e)=>{const cur=plan.progress[ikey]||{done:true};cur.actualKm=e.target.value;plan.progress[ikey]=cur;await savePlan(plan);};}
     // Wire move button
