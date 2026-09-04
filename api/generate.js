@@ -31,12 +31,41 @@ const rateLimitMap = new Map();
 const RATE_LIMIT = 5;
 const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
-const VALID_SPORTS = ["cykling", "løb", "svømning"];
+// The app stores sport as ASCII keys (cykling/lob/svomning) — they double as
+// object keys and DOM data attributes, and api/scan.js already speaks them.
+// The prompt and the returned plan use the real Danish words. Normalize at the
+// boundary so both spellings are accepted and one canonical form goes onward.
+const SPORT_ALIASES = {
+  cykling: "cykling",
+  lob: "løb",
+  løb: "løb",
+  svomning: "svømning",
+  svømning: "svømning",
+};
 const VALID_FITNESS_LEVELS = ["Begynder", "Motionist", "Erfaren", "Konkurrerende"];
 const VALID_PHASES = ["BASE", "BUILD", "PEAK", "TAPER", "RACE WEEK"];
 const MAX_WEEKS = 24;
 const DEFAULT_WEEKS = 12;
 const GOAL_EVENT_MAX_CHARS = 200;
+const MAX_TARGET_KM = 5000;
+const MIN_SESSIONS_PER_WEEK = 1;
+const MAX_SESSIONS_PER_WEEK = 7;
+const FITNESS_SESSIONS = { Begynder: 3, Motionist: 4, Erfaren: 5, Konkurrerende: 6 };
+// The longest session peaks at ~80% of the target distance — the same heuristic
+// the local generatePlan() fallback uses, so an AI plan and a fallback plan for
+// the same input build toward the same place.
+const PEAK_FRACTION = 0.8;
+// The app has a DA/EN toggle, so the plan text has to follow it. Absent =
+// Danish, which is what every caller before this sent.
+const VALID_LANGUAGES = ["da", "en"];
+const DEFAULT_LANGUAGE = "da";
+// The JSON "sport" field stays the canonical Danish key in both languages — it
+// is an identifier the model echoes back and validatePlan checks, not display
+// text. Only the wording in the brief changes.
+const SPORT_WORDS = {
+  da: { cykling: "cykling", "løb": "løb", "svømning": "svømning" },
+  en: { cykling: "cycling", "løb": "running", "svømning": "swimming" },
+};
 
 // Deterministic phase allocation — validated by prompt-validation gate (2026-09-04).
 // The original approach (embedding this table as prose and asking Claude to compute
@@ -76,27 +105,77 @@ function allocatePhases(weeksToRace) {
   return [...Array(baseCount + extra).fill("BASE"), ...rest];
 }
 
-const SYSTEM = `Du er en erfaren cykeltræner og triatloncoach med 15 års erfaring. Du genererer strukturerede træningsplaner på dansk.
+const SYSTEM = {
+  da: `Du er en erfaren cykeltræner og triatloncoach med 15 års erfaring. Du genererer strukturerede træningsplaner på dansk.
 
-Du SKAL returnere valid JSON og intet andet. Ingen markdown-kodeblokke. Ingen forklaringstekst. Kun JSON.`;
+Du SKAL returnere valid JSON og intet andet. Ingen markdown-kodeblokke. Ingen forklaringstekst. Kun JSON.`,
+  en: `You are an experienced cycling and triathlon coach with 15 years of experience. You generate structured training plans in English.
 
-function buildUserMessage({ sport, fitness_level, longest_session_km, goal_event }, phases) {
+You MUST return valid JSON and nothing else. No markdown code blocks. No explanatory text. Only JSON.`,
+};
+
+function buildUserMessage(
+  { sport, fitness_level, longest_session_km, target_km, sessions_per_week, goal_event, language },
+  phases
+) {
+  const lang = language === "en" ? "en" : "da";
+  const sessionsPerWeek = sessions_per_week ?? FITNESS_SESSIONS[fitness_level];
+  const sportWord = SPORT_WORDS[lang][sport];
+  // Every number the model needs is computed here rather than described to it.
+  // The prompt-validation gate (2026-09-04) showed Haiku is unreliable at
+  // arithmetic embedded in prose — the same reason phases are precomputed.
+  const peakKm = target_km ? Math.round(target_km * PEAK_FRACTION) : null;
+
+  if (lang === "en") {
+    const weeksList = phases.map((p, i) => `Week ${i + 1}: phase ${p}`).join("\n");
+    const targetLine = target_km ? `\n- Target distance: ${target_km} km` : "";
+    // Plans shorter than 7 weeks have no PEAK phase at all (see BASE_TABLE), so
+    // this anchors on "the plan's longest session" rather than a named phase.
+    const kmInstruction = target_km
+      ? `Km per session: start from ${longest_session_km} km as the longest session in week 1 and build up gradually. The plan's longest session should be around ${peakKm} km, and the target distance of ${target_km} km is completed in the final week.`
+      : `Km per session: start from ${longest_session_km} km and build up gradually through the plan.`;
+    return `Generate a training plan with these details:
+- Sport: ${sportWord}
+- Fitness level: ${fitness_level} (Begynder=beginner/Motionist=intermediate/Erfaren=experienced/Konkurrerende=competitive)
+- Longest session in the last 4 weeks: ${longest_session_km} km${targetLine}
+- Goal: ${goal_event}
+
+The phases are already fixed for each of the ${phases.length} weeks — use EXACTLY this order, do not change it:
+${weeksList}
+
+For each week, generate ${sessionsPerWeek} sessions as ["Session name", km_number, "coach_note"].
+${kmInstruction}
+Coach note: explain WHY (not what), max 15 words.
+
+Return EXACTLY this JSON structure and nothing else, with exactly ${phases.length} weeks in the "weeks" array, in the same order as the list above. Keep the "sport" value exactly as written here:
+{
+  "label": "Short plan title in English",
+  "sport": "${sport}",
+  "weeks": [
+    { "phase": "<the phase for week 1 from the list above>", "items": [["Session name", km_number, "coach_note"]] }
+  ]
+}`;
+  }
+
   const weeksList = phases.map((p, i) => `Uge ${i + 1}: fase ${p}`).join("\n");
-  const sessionsPerWeek = { Begynder: 3, Motionist: 4, Erfaren: 5, Konkurrerende: 6 }[fitness_level];
+  const targetLine = target_km ? `\n- Måldistance: ${target_km} km` : "";
+  const kmInstruction = target_km
+    ? `Km pr. session: start fra ${longest_session_km} km som længste session i uge 1 og byg gradvist op. Planens længste session skal ligge omkring ${peakKm} km, og selve måldistancen på ${target_km} km gennemføres i den sidste uge.`
+    : `Km pr. session: start fra ${longest_session_km} km og byg gradvist op gennem planen.`;
   return `Generer en træningsplan med disse oplysninger:
-- Sport: ${sport}
+- Sport: ${sportWord}
 - Fitnessniveau: ${fitness_level} (Begynder/Motionist/Erfaren/Konkurrerende)
-- Længste træning de seneste 4 uger: ${longest_session_km} km
+- Længste træning de seneste 4 uger: ${longest_session_km} km${targetLine}
 - Mål: ${goal_event}
 
 Faserne er allerede fastlagt for hver af de ${phases.length} uger — brug PRÆCIS denne rækkefølge, ændr den ikke:
 ${weeksList}
 
 For hver uge, generer ${sessionsPerWeek} sessioner som ["Sessionsnavn", km_tal, "coach_note"].
-Km pr. session: start fra ${longest_session_km} km og byg gradvist op gennem planen.
+${kmInstruction}
 Coach-note: forklar HVORFOR (ikke hvad), max 15 ord.
 
-Returnér PRÆCIS denne JSON-struktur og intet andet, med nøjagtig ${phases.length} uger i "weeks"-arrayet, i samme rækkefølge som listen ovenfor:
+Returnér PRÆCIS denne JSON-struktur og intet andet, med nøjagtig ${phases.length} uger i "weeks"-arrayet, i samme rækkefølge som listen ovenfor. Behold "sport"-værdien præcis som skrevet her:
 {
   "label": "Kort plantitel på dansk",
   "sport": "${sport}",
@@ -147,7 +226,7 @@ async function generateOnce(input, phases) {
     {
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: SYSTEM,
+      system: SYSTEM[input.language],
       messages: [{ role: "user", content: buildUserMessage(input, phases) }],
     },
     { timeout: CLAUDE_TIMEOUT_MS }
@@ -180,13 +259,48 @@ export default async function handler(req, res) {
   entry.count++;
   rateLimitMap.set(ip, entry);
 
-  const { sport, fitness_level, longest_session_km, race_date, plan_weeks, goal_event } = req.body || {};
+  const {
+    sport: rawSport,
+    fitness_level,
+    longest_session_km,
+    target_km,
+    sessions_per_week,
+    language,
+    race_date,
+    plan_weeks,
+    goal_event,
+  } = req.body || {};
 
-  if (!VALID_SPORTS.includes(sport)) {
+  const sport = SPORT_ALIASES[rawSport];
+  if (!sport) {
     return res.status(400).json({ error: "invalid_sport" });
   }
   if (!VALID_FITNESS_LEVELS.includes(fitness_level)) {
     return res.status(400).json({ error: "invalid_fitness_level" });
+  }
+
+  // Both optional: callers that predate this contract still work, and the prompt
+  // falls back to its original wording when they are absent.
+  let targetKm = null;
+  if (target_km !== undefined && target_km !== null && target_km !== "") {
+    targetKm = Number(target_km);
+    if (!Number.isFinite(targetKm) || targetKm <= 0 || targetKm > MAX_TARGET_KM) {
+      return res.status(400).json({ error: "invalid_target_km" });
+    }
+  }
+
+  const planLanguage = VALID_LANGUAGES.includes(language) ? language : DEFAULT_LANGUAGE;
+
+  let sessionsPerWeek = null;
+  if (sessions_per_week !== undefined && sessions_per_week !== null && sessions_per_week !== "") {
+    sessionsPerWeek = Number(sessions_per_week);
+    if (
+      !Number.isInteger(sessionsPerWeek) ||
+      sessionsPerWeek < MIN_SESSIONS_PER_WEEK ||
+      sessionsPerWeek > MAX_SESSIONS_PER_WEEK
+    ) {
+      return res.status(400).json({ error: "invalid_sessions_per_week" });
+    }
   }
 
   let weeksToRace;
@@ -218,6 +332,9 @@ export default async function handler(req, res) {
     sport,
     fitness_level,
     longest_session_km: Number(longest_session_km) >= 0 ? Number(longest_session_km) : 0,
+    target_km: targetKm,
+    sessions_per_week: sessionsPerWeek,
+    language: planLanguage,
     goal_event: typeof goal_event === "string" ? goal_event.slice(0, GOAL_EVENT_MAX_CHARS) : "",
   };
   const phases = allocatePhases(weeksToRace);
