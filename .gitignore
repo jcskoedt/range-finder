@@ -5,3 +5,7 @@ node_modules/
 .design-audit/
 .gstack/
 screenshots/
+
+# Design assets for another project — the .site file is 130MB, over GitHub's limit
+FIG/
+Ugebogen.dc.html

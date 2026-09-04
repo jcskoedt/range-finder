@@ -1,18 +1,31 @@
 # Range Finder — Handoff
-Sidst opdateret: 2026-09-04 (sen aften)
+Sidst opdateret: 2026-09-05 (sprogskifter)
 
-## ⚠️ BLOKERENDE — ret dette først
-`ANTHROPIC_API_KEY` i Vercels miljøvariabler er **ikke scoped til et workspace**. Anthropic afviser derfor ALLE kald fra `api/generate.js` (og formentlig `api/scan.js`, samme nøgle) med:
+## ⚠️ BLOKERENDE — ét trin tilbage
+`ANTHROPIC_API_KEY` er en org-nøgle uden workspace-scope, så Anthropic afviser alle kald fra `api/generate.js` og `api/scan.js` med:
 > "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header..."
 
-**Fix (vælg én):**
-1. Gå til console.anthropic.com → generér en ny API-nøgle scoped til et specifikt workspace, og udskift `ANTHROPIC_API_KEY` i Vercel med den, ELLER
-2. Behold nøglen, men tilføj miljøvariablen `ANTHROPIC_WORKSPACE_ID` i Vercel med det korrekte workspace-ID — `api/generate.js` er allerede forberedt til at sende denne header automatisk hvis variablen findes (se toppen af filen).
+**Status 2026-09-05:** Mulighed B er valgt og halvvejs udført.
+- ✅ `ANTHROPIC_WORKSPACE_ID` er sat i Vercel (Production) — bekræftet med `vercel env ls`
+- ✅ `api/scan.js` sender nu samme workspace-header som `generate.js` (den manglede — screenshot-import ville ellers være blevet ved med at fejle)
+- ⬜ **Mangler: redeploy.** Env-ændringer slår ikke igennem på eksisterende deployments. Kør:
+  ```bash
+  cd /Users/jacobcompenskodt/06RANGE_FINDER
+  vercel --prod
+  vercel ls rangefinderapp                       # find nyeste "Ready" deployment
+  vercel alias set <nyeste-url> rangefinderapp.vercel.app
+  ```
+- ⬜ **Mangler: verifikation.** Skal give en JSON-plan (HTTP 200), ikke `generation_failed`:
+  ```bash
+  curl -s -m 90 -X POST https://rangefinderapp.vercel.app/api/generate \
+    -H "Content-Type: application/json" \
+    -d '{"sport":"lob","fitness_level":"Motionist","longest_session_km":10,"target_km":42,"plan_weeks":4,"goal_event":"maraton"}'
+  ```
 
-Verificér med: `curl -X POST https://rangefinderapp.vercel.app/api/generate -H "Content-Type: application/json" -d '{"sport":"cykling","fitness_level":"Motionist","longest_session_km":40,"goal_event":"test"}'` — skal give en JSON-plan (HTTP 200), ikke `{"error":"generation_failed"}`.
+Bemærk: env-vars findes kun i **Production**. Preview og `vercel dev` har ingen nøgle, så AI-funktioner kan ikke testes lokalt eller i preview før de også tilføjes der. Se TODOS.md for kommandoerne.
 
 ## Status i én sætning
-Alle plan-reviews er clearet, `api/generate.js` er bygget og lokalt testet mod den ægte Anthropic API, en kritisk produktions-routing-bug (alle `/api/*`-endpoints har 404'et siden projektet blev oprettet) er fundet og rettet — men API-nøglen blokerer stadig ægte kald (se ovenfor), og **frontenden kalder endnu ikke `/api/generate`**. Wizarden bruger stadig den lokale `generatePlan()`-algoritme bag en kunstig 8 sek. loading-skærm.
+Alle plan-reviews er clearet, `api/generate.js` er bygget, routing-buggen er rettet, og kontrakten mellem frontend og API er lukket (2026-09-05) — men nøglefixet mangler et redeploy før noget AI-relateret kan verificeres, Wizarden kalder nu `/api/generate` med algoritmen som fallback (browser-verificeret mod en stub), men det ægte Anthropic-kald er aldrig lykkedes endnu.
 
 ---
 
@@ -62,9 +75,11 @@ Dette bør fikses permanent (se "Kendte tekniske gæld" nedenfor) i stedet for a
 - Screenshot-upload-boksen er genindført (var faldet ud i en tidligere refaktorering)
 - To separate produktionsbugs fundet og rettet undervejs — se "Reviews" nedenfor
 
-### Wizard loading-skærm — LIVE, men **kobler ikke til `/api/generate`**
-- Efter tryk på "Generate plan": 8 sek. spinner + roterende "Din AI-coach tænker..."-tekst, derefter kaldes den LOKALE `generatePlan()`-algoritme (uændret adfærd, bare med en kunstig pause foran)
-- Dette er en placeholder for den rigtige UX — når `/api/generate` kobles til, skal loading-skærmen vise sig, MENS det ægte API-kald løber (som kan tage 15-35 sek, se nedenfor), ikke en fast 8 sek. timer der ikke har forbindelse til noget reelt
+### Wizard → /api/generate — KOBLET 2026-09-05 (ikke deployet endnu)
+- "Generate plan" kalder nu `/api/generate` med wizardens felter og venter på det ægte svar. Ingen kunstig timer.
+- Enhver fejl (afvisning, 4xx/5xx, netværksfejl, 95 sek timeout, ugyldig plan) falder tilbage til `generatePlan()` og viser et gult banner der siger hvorfor.
+- Nyt felt i wizarden: **Fitness level** — `/api/generate` svarer 400 uden det.
+- Alle veje browser-verificeret mod en lokal stub-server. Selve Anthropic-kaldet er uverificeret indtil nøglen er deployet.
 
 ---
 
@@ -118,15 +133,21 @@ To rigtige produktionsbugs blev fundet og rettet undervejs i eng-review (begge a
 
 ## Næste skridt (i rækkefølge)
 
-1. **Ret API-nøglen** — se "BLOKERENDE" øverst i denne fil. Ingenting AI-relateret virker før dette er løst.
-2. **Kobl `/api/generate` til wizarden.** Erstat det direkte `generatePlan()`-kald i `generateBtn`-handleren med et `fetch("/api/generate", ...)`-kald. Behold algoritmen som fallback ved `generation_failed`.
-3. **Ret loading-skærmens tidsstyring** — den skal vente på det ægte API-svar (15-35+ sek reel tid), ikke en fast 8 sek. timer.
-4. **Byg de 3 nye wizard-felter:** fitnessniveau (dropdown), længste session (km), løbsdato (valgfri dato).
-5. **Coach-note-rendering:** `[navn, km, coach_note]`-arrays skal vises med coach_note som kursiv linje under sessionsnavnet.
-6. **Progress Ring** på I DAG-fanen — genbrug `plan.progress`/`computeStats()`, IKKE en ny localStorage-struktur (se eng-review-fund).
-7. **Email-felt** i wizarden (valgfrit, sidste felt) — kun til localStorage i B, ingen ekstern kald.
+1. **Redeploy + verificér nøglen** — se "BLOKERENDE" øverst. Intet AI-relateret kan verificeres før dette.
+2. ~~**Luk kontrakten frontend ↔ API**~~ — DONE 2026-09-05. Sport-aliaser, `target_km`, `sessions_per_week` og `apiPlanToLocalPlan()`. Se TODOS.md → "Kontrakt frontend ↔ API" for hvad der var i stykker og hvorfor.
+3. ~~**Kobl `/api/generate` til wizarden**~~ — DONE 2026-09-05. Kalder API'et, mapper via `apiPlanToLocalPlan()`, falder tilbage til `generatePlan()` på enhver fejl, og viser et banner der siger hvorfor. Alle syv veje er browser-verificeret mod en stub-server (se TODOS.md).
+4. ~~**Ret loading-skærmens tidsstyring**~~ — DONE 2026-09-05. Venter på det ægte svar; klient-timeout 95 sek.
+5. **Resterende wizard-felt:** løbsdato (valgfri dato). Fitnessniveau er bygget (det var påkrævet af API'et), og længste session fandtes allerede. Løbsdato dækkes funktionelt af "Time available" via `plan_weeks` — det er nu et UX-valg, ikke en blokering.
+6. **Coach-note-rendering:** `items[2]` vises i dag kun i den udfoldede detalje (`.item-note`). Skal frem som kursiv linje under sessionsnavnet.
+7. **Progress Ring** på I DAG-fanen — genbrug `plan.progress`/`computeStats()`, IKKE en ny localStorage-struktur (se eng-review-fund).
+8. **Email-felt** i wizarden (valgfrit, sidste felt) — kun til localStorage i B, ingen ekstern kald.
 
----
+### Sprog — løst 2026-09-05
+Sprogmikset er væk. Alle brugervendte strenge ligger i `I18N` i index.html, `t()` slår op, og DA/EN-knappen i baren øverst skifter hele siden inkl. datoer, tempo/ernæring og faseforklaring. Valget ligger i `localStorage` under `rf-lang`; første besøg følger browseren. `/api/generate` tager `language` og har en engelsk prompt-variant, så AI-planens indhold følger sproget.
+
+Planer beholder det sprog de blev lavet på — sessionsnavne og coach-noter er data, ikke UI. Chrome skifter live, også på gamle planer.
+
+`tempoFn`'s døde substring-matching er også rettet undervejs: den matchede på danske ord mens `generatePlan()` skrev engelske noter, så den ramte altid default-grenen. Items bærer nu en stabil `kind` på index 3 (`intervals`/`veryeasy`/`long`/`b2b`), og `tempoFn` skifter på den. AI-items har ingen `kind` og får default, hvilket er rigtigt for en coach-note i prosa.
 
 ## Nøglefiler
 
