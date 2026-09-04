@@ -1,6 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// If ANTHROPIC_API_KEY is an organization-level key (not scoped to a single
+// workspace), Anthropic requires an anthropic-workspace-id header on every
+// request. Set ANTHROPIC_WORKSPACE_ID in Vercel's env vars if you hit:
+// "This API key is not scoped to a workspace..." (seen in production logs
+// 2026-09-04 — this env var was not set, and the key in use needs it).
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  ...(process.env.ANTHROPIC_WORKSPACE_ID
+    ? { defaultHeaders: { "anthropic-workspace-id": process.env.ANTHROPIC_WORKSPACE_ID } }
+    : {}),
+});
 
 const MODEL = "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 4096;
