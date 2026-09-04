@@ -116,6 +116,22 @@ body{
     transform:translateY(-50%);
   }
 }
+.hero-video-toggle{
+  position:absolute;
+  bottom:16px;right:16px;
+  width:36px;height:36px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(10,10,10,0.5);
+  border:1px solid rgba(245,230,66,0.4);
+  border-radius:50%;
+  cursor:pointer;
+  padding:0;
+}
+.hero-video-toggle svg{
+  width:14px;height:14px;
+  fill:var(--yellow);
+}
+.hero-video-toggle:hover{background:rgba(10,10,10,0.7);}
 .hero-wordmark{
   display:flex;
   align-items:center;
@@ -244,7 +260,7 @@ body{
 .btn{
   display:inline-block;
   background:var(--text);
-  color:#fff;
+  color:var(--yellow);
   border:2px solid var(--text);
   font-family:'Turret Road',sans-serif;
   font-size:13px;
@@ -1136,10 +1152,13 @@ function renderLibrary(loading){
   let heroHtml=`
     <div class="ticker-wrap"><div class="ticker-track">${tickerContent}${tickerContent}</div></div>
     <div class="hero">
-      <video class="hero-video" autoplay muted loop playsinline>
+      <video class="hero-video" id="heroVideo" autoplay muted loop playsinline>
         <source src="hero-video.mp4" type="video/mp4">
       </video>
       <div class="hero-scrim"></div>
+      <button class="hero-video-toggle" id="heroVideoToggle" aria-label="Pause video">
+        <svg viewBox="0 0 16 16"><rect x="4" y="2" width="3" height="12"/><rect x="9" y="2" width="3" height="12"/></svg>
+      </button>
       <div class="hero-wordmark">
         <div class="hero-wordmark-icon">
           <svg viewBox="0 0 16 16"><polyline points="2,11 5,7 8,9 11,5 14,7"/></svg>
@@ -1235,6 +1254,16 @@ function renderLibrary(loading){
   app.innerHTML=heroHtml+plansHtml+howHtml;
 
   document.getElementById("newPlanBtn").onclick=()=>{state.view="wizard";render();};
+  const heroVideo=document.getElementById("heroVideo");
+  const heroVideoToggle=document.getElementById("heroVideoToggle");
+  if(heroVideo&&heroVideoToggle){
+    const pauseIcon='<svg viewBox="0 0 16 16"><rect x="4" y="2" width="3" height="12"/><rect x="9" y="2" width="3" height="12"/></svg>';
+    const playIcon='<svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg>';
+    heroVideoToggle.onclick=()=>{
+      if(heroVideo.paused){heroVideo.play();heroVideoToggle.innerHTML=pauseIcon;heroVideoToggle.setAttribute("aria-label","Pause video");}
+      else{heroVideo.pause();heroVideoToggle.innerHTML=playIcon;heroVideoToggle.setAttribute("aria-label","Play video");}
+    };
+  }
   const btn2=document.getElementById("newPlanBtn2");
   if(btn2) btn2.onclick=()=>{state.view="wizard";render();};
   const scrollBtn=document.getElementById("scrollToPlans");
