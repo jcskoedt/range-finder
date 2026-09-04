@@ -3,11 +3,15 @@
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
     { "src": "logo.png", "use": "@vercel/static" },
+    { "src": "landing-hero-mockup.html", "use": "@vercel/static" },
+    { "src": "hero-video.mp4", "use": "@vercel/static" },
     { "src": "api/*.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/logo.png", "dest": "/logo.png" },
+    { "src": "/landing-hero-mockup.html", "dest": "/landing-hero-mockup.html" },
+    { "src": "/hero-video.mp4", "dest": "/hero-video.mp4" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
