@@ -1,6 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// ANTHROPIC_API_KEY is an organization-level key (not scoped to a single
+// workspace), so Anthropic requires an anthropic-workspace-id header on every
+// request. Without it: "This API key is not scoped to a workspace...".
+// ANTHROPIC_WORKSPACE_ID is set in Vercel; same pattern as api/generate.js.
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  ...(process.env.ANTHROPIC_WORKSPACE_ID
+    ? { defaultHeaders: { "anthropic-workspace-id": process.env.ANTHROPIC_WORKSPACE_ID } }
+    : {}),
+});
 
 // Best-effort in-memory rate limiting (resets per cold start, good enough for MVP)
 const rateLimitMap = new Map();
