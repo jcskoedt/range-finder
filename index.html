@@ -1710,7 +1710,7 @@ function renderTabPlan(plan,c){
           <div class="phase-name">${phase.name}</div>
           <div class="phase-meta">Uge ${startWk}${startWk!==endWk?'–'+endWk:''} · ${wCount} ${wCount===1?'uge':'uger'} · ${totalKm} km</div>
         </div>
-        <div class="phase-arrow">${isPhaseOpen?'▲':'▼'}</div>
+        <div class="phase-arrow">${isPhaseOpen?'▴':'▾'}</div>
       </div>
       ${isPhaseOpen?`<div class="phase-body">${bodyHtml}</div>`:''}
     </div>`;
