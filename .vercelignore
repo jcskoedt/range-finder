@@ -1,0 +1,16 @@
+# Vercel does not read .gitignore — without this file the whole directory is
+# uploaded. FIG/ alone is 149MB and its .site file is past the 100MB per-file
+# limit, which is what broke the 2026-09-05 deploy.
+FIG/
+Ugebogen.dc.html
+
+# Local-only working files, never served
+.git/
+.gstack/
+.design-audit/
+screenshots/
+*.md
+
+# Source assets that no route in vercel.json points at
+RANGE_FINDER_LOGO.png
+icon-1024.png
