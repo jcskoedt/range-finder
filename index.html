@@ -652,6 +652,26 @@ body{
 .item-body{flex:1;}
 .item-label{font-size:14px;font-weight:600;}
 .item-label.checked{color:var(--subtle);text-decoration:line-through;}
+#app{padding-bottom:72px;}
+.lang-toggle{
+  position:fixed;bottom:16px;right:16px;z-index:50;
+  display:flex;border:2px solid var(--border);background:var(--bg);
+  box-shadow:0 2px 10px rgba(0,0,0,0.18);
+}
+.lang-toggle button{
+  font-family:inherit;font-size:10px;font-weight:700;letter-spacing:0.08em;
+  padding:5px 9px;border:none;background:none;cursor:pointer;color:var(--subtle);
+}
+.lang-toggle button.active{background:var(--yellow);color:var(--text);}
+.plan-notice{
+  display:flex;gap:12px;align-items:flex-start;
+  padding:14px 24px;border-bottom:2px solid var(--border);
+  background:var(--yellow);font-size:12px;line-height:1.5;
+}
+.plan-notice-close{
+  background:none;border:none;cursor:pointer;font-size:15px;
+  line-height:1;padding:0;color:var(--text);flex-shrink:0;
+}
 .item-note{font-size:12px;color:var(--subtle);margin-top:2px;}
 .item-meta{font-size:12px;margin-top:6px;color:#444;}
 .item-meta .meta-label{
@@ -920,6 +940,11 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
 </head>
 <body>
 
+<div class="lang-toggle" id="langToggle">
+  <button type="button" data-lang="da">DA</button>
+  <button type="button" data-lang="en">EN</button>
+</div>
+
 <div id="app"></div>
 
 <script>
@@ -935,60 +960,316 @@ if (!window.storage) {
 }
 
 /* ---------------- SPORT CONFIG ---------------- */
+/* ---------------- I18N ---------------- */
+// Every user-facing string lives here. The app was half English (landing,
+// wizard) and half Danish (plan view, coach notes) before this; the toggle in
+// the top right switches all of it, including what /api/generate writes.
+const I18N={
+en:{
+  // landing
+  tick_1:"Consistency beats perfection", tick_2:"Every session counts", tick_3:"Rest is part of the plan",
+  tick_4:"Train to the line", tick_5:"Miles make champions", tick_6:"Show up. Do the work. Repeat",
+  tick_7:"You don't find the finish line — you earn it", tick_8:"One more week. One more session",
+  tick_9:"Fatigue is temporary. Fitness is permanent", tick_10:"The best plan is the one you follow",
+  pause_video:"Pause video",
+  hero_eyebrow:"AI-coached training plans",
+  hero_h1:"Your season,<br>structured.",
+  hero_sub:"Upload a screenshot of your recent activities and get a personalised 4-week training plan — no coach, no complex software.",
+  hero_cta:"Build my plan →", hero_cta_note:"Free to start",
+  proof_text:"<strong>For cyclists, runners &amp; triathletes</strong> training 5–10 hrs/week without a coach",
+  // library
+  loading_plans:"Loading your plans…", my_plans:"My plans", no_plans:"No plans yet",
+  card_meta:"{w} weeks · {s} sessions/week · {d}",
+  week_abbr:"WEEK", sess_abbr:"sess.",
+  phase_meta:"Week {range} · {n} {unit} · {km} km", unit_week:"week", unit_weeks:"weeks",
+  psum_meta:"{sport} · {km} km total · {n} weeks · {left} weeks left",
+  no_plans_sub:"Upload a screenshot above to generate your first training plan.",
+  new_plan:"+ New plan", how_it_works:"How it works",
+  hiw_1_t:"Upload a screenshot", hiw_1_b:"Your Strava, Garmin, or Apple Fitness feed — 2–4 weeks of history is enough.",
+  hiw_2_t:"Get a 4-week plan", hiw_2_b:"Structured sessions: easy runs, threshold work, long rides. Calibrated to what you've been doing.",
+  hiw_3_t:"Check off each session", hiw_3_b:"Your plan lives in the app. Tick sessions as you go. Regenerate when life happens.",
+  // wizard
+  wizard_title:"NEW PLAN", back:"← Back", your_sport:"Your sport",
+  fitness_level:"Fitness level",
+  fit_beginner:"Beginner", fit_intermediate:"Intermediate", fit_experienced:"Experienced", fit_competitive:"Competitive",
+  target_distance:"Target distance (km)", time_available:"Time available", sessions_per_week:"Sessions per week",
+  start_date:"Start date", min_session:"Minimum session length", current_longest:"Current longest session (km, optional)",
+  ph_200:"e.g. 200", ph_3:"e.g. 3", ph_80:"e.g. 80", no_minimum:"No minimum",
+  generate_plan:"Generate plan →", err_target:"Enter a target distance and number of weeks.",
+  weeks_1:"1 week", weeks_2:"2 weeks", weeks_4:"4 weeks (1 month)", weeks_8:"8 weeks (2 months)",
+  weeks_12:"12 weeks (3 months)", weeks_16:"16 weeks (4 months)", weeks_20:"20 weeks (5 months)",
+  weeks_24:"24 weeks (6 months)", weeks_36:"36 weeks (9 months)", weeks_52:"52 weeks (1 year)",
+  // generating
+  ai_thinking:"Your AI coach is thinking…",
+  load_1:"Analysing your training history…", load_2:"Working out the phases…", load_3:"Building the weekly structure…",
+  load_4:"Writing coach notes…", load_5:"Final polish…",
+  notice_capped:"Your plan was shortened to {n} weeks — that's the longest plan the AI coach makes.",
+  notice_ratelimit:"You've made a lot of plans in a short time. This one uses our own algorithm.",
+  notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
+  close:"Close",
+  // plan view
+  back_plans:"← Plans", tab_today:"Today", tab_plan:"Plan", tab_stats:"Stats",
+  rest_day:"Rest day", no_session:"No session", rest_is_part:"Recovery is part of the plan.",
+  free_day:"Free day — no session planned.", plan_not_started:"The plan hasn't started yet.",
+  completed:"✓ Completed", move_session:"Move session", undo:"Undo", log_session:"Log session →",
+  pace:"Pace", nutrition:"Nutrition", note:"Note", next_session:"Next session",
+  extra:"Extra", add_extra:"+ Add extra session", confirm:"Confirm",
+  upload_screenshot_opt:"Upload screenshot (optional)", save_extra:"Save extra session", cancel:"Cancel",
+  this_week:"This week", next_week:"Next week",
+  mark_done:"Mark complete · {km} km", planned:"/ {km} km planned",
+  ph_name:"Name (e.g. Run)", ph_km:"Km",
+  phases_title:"What do the phases mean?",
+  ph_base_d:"Builds the aerobic foundation — low intensity, high volume.",
+  ph_build_d:"Intervals and tempo sessions prepare the body for race pace.",
+  ph_peak_d:"Maximum load. This is you at your strongest.",
+  ph_taper_d:"Reduced volume — the body rests and charges up for the race.",
+  ph_race_d:"Fresh legs and focus. This is your race.",
+  import_title:"Import from screenshot",
+  import_body:"Upload a screenshot from Strava, Garmin, Polar or similar — we find your activities automatically.",
+  choose_image:"Choose image", import_formats:"PNG, JPG or WebP · Strava, Garmin, Polar and more",
+  analysing:"Analysing image…", log_it:"Log it", match_activities:"Match your activities to sessions:",
+  stat_km:"Km ridden", stat_sessions:"Sessions", stat_longest:"Longest ride", stat_weeks_left:"Weeks to go",
+  stat_km_week:"Km per week", stat_phase_progress:"Phase progress",
+  reset_progress:"Reset progress", delete_plan:"Delete plan",
+  logged:"✓ Logged", log_short:"Log", prev_week:"Previous week",
+  weeks_in:"In {n} weeks", weeks_ago:"{n} weeks ago", finished:"Done",
+  sure_again:"⚠ Sure? Tap again", sure_delete:"⚠ Sure? Tap again to delete",
+  // dates
+  days:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], locale:"en-GB",
+  // sports
+  sport_cykling:"Cycling", sport_lob:"Running", sport_svomning:"Swimming",
+  goal_cykling:"bike race", goal_lob:"run", goal_svomning:"swim",
+  ivl_cykling:["3x10 min sweet spot","4x12 min sweet spot","4x15 min sweet spot","3x20 min sweet spot"],
+  ivl_lob:["4x4 min at threshold pace","5x5 min at threshold pace","3x8 min at threshold pace","2x15 min at threshold pace"],
+  ivl_svomning:["8x100m, 20 sec rest","10x100m, 15 sec rest","6x200m, 30 sec rest","4x300m, 30 sec rest"],
+  // session names
+  sn_cykling:{support:["Zone 2 ride","Interval session","Recovery ride","Zone 2 ride"],long:"Long ride",event:"Race day",b2b0:"Long ride (day 1)",b2b1:"Easy ride (day 2)"},
+  sn_lob:{support:["Easy run","Tempo session","Recovery jog","Easy run"],long:"Long run",event:"Race day",b2b0:"Long run (day 1)",b2b1:"Easy jog (day 2)"},
+  sn_svomning:{support:["Easy swim","Interval set","Recovery swim","Easy swim"],long:"Long swim",event:"Race day",b2b0:"Long swim (day 1)",b2b1:"Easy swim (day 2)"},
+  // generated notes
+  note_intervals:"intervals: {scheme}", note_veryeasy:"very easy",
+  note_b2b:"right after previous session, no rest day in between",
+  note_longest:"plan's longest session — a full dress rehearsal for race day",
+  note_restup:"rest up before and after",
+  // phase names written by the local generator
+  phase_base1:"Base 1", phase_base2:"Base 2", phase_build1:"Build 1", phase_build2:"Build 2",
+  phase_peak:"Peak", phase_taper:"Taper", phase_raceweek:"Race Week", phase_build:"Build",
+  api_BASE:"Base", api_BUILD:"Build", api_PEAK:"Peak", api_TAPER:"Taper", "api_RACE WEEK":"Race Week",
+  suffix_recovery:"recovery", suffix_b2b:"back-to-back",
+  // pace
+  tempo_cykling_b2b:"Very easy, 18-20 km/h, RPE 3. Riding on tired legs from the day before.",
+  tempo_cykling_int:"Easy warm-up/cool-down, 20-22 km/h, RPE 3-4. During intervals: RPE 6-7.",
+  tempo_cykling_long_far:"Very easy, 19-20 km/h, RPE 3-4. Hold back for the first 60-70 km.",
+  tempo_cykling_long_near:"Easy, 19-21 km/h, RPE 3-5. Start conservatively.",
+  tempo_cykling_veryeasy:"Very easy, 18-20 km/h, RPE 2-3.",
+  tempo_cykling_default:"Easy, Zone 2, 20-22 km/h, RPE 3-4.",
+  tempo_lob_b2b:"Very easy, conversational pace, RPE 3. Running on tired legs from the day before.",
+  tempo_lob_int:"Easy jog warm-up 10-15 min, then threshold intervals, easy cool-down. RPE 7-8 during intervals.",
+  tempo_lob_long_far:"Very easy, conversational pace, RPE 3-4. Hold back for the first 25%.",
+  tempo_lob_long_near:"Easy, conversational pace, RPE 3-5.",
+  tempo_lob_veryeasy:"Very easy jog pace, RPE 2-3.",
+  tempo_lob_default:"Easy jog pace, RPE 3-4 — you should be able to speak in full sentences.",
+  tempo_svomning_b2b:"Very easy, technique focus, no intensity.",
+  tempo_svomning_int:"300-400m easy warm-up, then interval set, easy cool-down. RPE 6-7 during the set.",
+  tempo_svomning_long_far:"Steady easy pace, focus on maintaining technique throughout, RPE 3-5.",
+  tempo_svomning_long_near:"Steady easy pace, focus on maintaining technique throughout, RPE 3-5.",
+  tempo_svomning_veryeasy:"Very easy, technique focus, RPE 2-3.",
+  tempo_svomning_default:"Easy, technique focus, RPE 3-4.",
+  // nutrition
+  nut_cykling_200:"Familiar breakfast before you start. Water throughout, 60-90 g carbs/hour, electrolytes.",
+  nut_cykling_100:"Steady hydration + electrolytes. 60-90 g carbs/hour from the start.",
+  nut_cykling_70:"Steady hydration. 1-2 gels, approx. 40-60 g carbs/hour after the first hour.",
+  nut_cykling_40:"Bring water. Consider an energy bar if the ride approaches 90 min.",
+  nut_cykling_0:"Water only.",
+  nut_lob_30:"Water + electrolytes throughout. 30-60 g carbs/hour from the start.",
+  nut_lob_18:"Water throughout. 1 gel after 60 min, approx. 30-40 g carbs/hour after that.",
+  nut_lob_10:"Water is enough — maybe a sip or two if it's hot.",
+  nut_lob_0:"Water only.",
+  nut_svomning_6:"Electrolytes and fuel at rest stops/turns every 30-45 min.",
+  nut_svomning_3:"Water at rest stops. Consider some fuel if swimming continuously for over 60 min.",
+  nut_svomning_0:"Water at rest stops is enough.",
+},
+da:{
+  tick_1:"Konsistens slår perfektion", tick_2:"Hver træning tæller", tick_3:"Hvile er en del af planen",
+  tick_4:"Træn frem mod stregen", tick_5:"Kilometer skaber mestre", tick_6:"Mød op. Gør arbejdet. Gentag",
+  tick_7:"Man finder ikke målstregen — man gør sig fortjent til den", tick_8:"En uge mere. En træning mere",
+  tick_9:"Træthed er midlertidig. Form er permanent", tick_10:"Den bedste plan er den, du følger",
+  pause_video:"Sæt video på pause",
+  hero_eyebrow:"AI-coachede træningsplaner",
+  hero_h1:"Din sæson,<br>struktureret.",
+  hero_sub:"Upload et screenshot af dine seneste aktiviteter og få en personlig 4-ugers træningsplan — ingen coach, ingen indviklet software.",
+  hero_cta:"Byg min plan →", hero_cta_note:"Gratis at starte",
+  proof_text:"<strong>Til cykelryttere, løbere &amp; triatleter</strong> der træner 5–10 timer om ugen uden coach",
+  loading_plans:"Indlæser dine planer…", my_plans:"Mine planer", no_plans:"Ingen planer endnu",
+  card_meta:"{w} uger · {s} træninger/uge · {d}",
+  week_abbr:"UGE", sess_abbr:"sess.",
+  phase_meta:"Uge {range} · {n} {unit} · {km} km", unit_week:"uge", unit_weeks:"uger",
+  psum_meta:"{sport} · {km} km i alt · {n} uger · {left} uger tilbage",
+  no_plans_sub:"Upload et screenshot ovenfor for at lave din første træningsplan.",
+  new_plan:"+ Ny plan", how_it_works:"Sådan virker det",
+  hiw_1_t:"Upload et screenshot", hiw_1_b:"Dit feed fra Strava, Garmin eller Apple Fitness — 2–4 ugers historik er nok.",
+  hiw_2_t:"Få en 4-ugers plan", hiw_2_b:"Strukturerede træninger: rolige ture, tærskelarbejde, lange ture. Kalibreret til det, du allerede laver.",
+  hiw_3_t:"Kryds hver træning af", hiw_3_b:"Planen bor i appen. Sæt flueben undervejs. Lav en ny, når livet kommer i vejen.",
+  wizard_title:"NY PLAN", back:"← Tilbage", your_sport:"Din sport",
+  fitness_level:"Niveau",
+  fit_beginner:"Begynder", fit_intermediate:"Motionist", fit_experienced:"Erfaren", fit_competitive:"Konkurrerende",
+  target_distance:"Måldistance (km)", time_available:"Tid til rådighed", sessions_per_week:"Træninger om ugen",
+  start_date:"Startdato", min_session:"Korteste træning", current_longest:"Længste træning lige nu (km, valgfrit)",
+  ph_200:"fx 200", ph_3:"fx 3", ph_80:"fx 80", no_minimum:"Intet minimum",
+  generate_plan:"Generér plan →", err_target:"Indtast en måldistance og et antal uger.",
+  weeks_1:"1 uge", weeks_2:"2 uger", weeks_4:"4 uger (1 måned)", weeks_8:"8 uger (2 måneder)",
+  weeks_12:"12 uger (3 måneder)", weeks_16:"16 uger (4 måneder)", weeks_20:"20 uger (5 måneder)",
+  weeks_24:"24 uger (6 måneder)", weeks_36:"36 uger (9 måneder)", weeks_52:"52 uger (1 år)",
+  ai_thinking:"Din AI-coach tænker…",
+  load_1:"Analyserer din træningshistorik…", load_2:"Beregner faseopdeling…", load_3:"Bygger ugentlig struktur…",
+  load_4:"Skriver coach-noter…", load_5:"Sidste finpudsning…",
+  notice_capped:"Planen er forkortet til {n} uger — det er den længste plan AI-coachen laver.",
+  notice_ratelimit:"Du har lavet mange planer på kort tid. Denne er lavet med vores egen algoritme.",
+  notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
+  close:"Luk",
+  back_plans:"← Planer", tab_today:"I dag", tab_plan:"Plan", tab_stats:"Tal",
+  rest_day:"Hviledag", no_session:"Ingen session", rest_is_part:"Restitution er en del af planen.",
+  free_day:"Fri dag — ingen træning planlagt.", plan_not_started:"Planen starter ikke i dag.",
+  completed:"✓ Gennemført", move_session:"Flyt træning", undo:"Fortryd", log_session:"Log session →",
+  pace:"Tempo", nutrition:"Ernæring", note:"Note", next_session:"Næste træning",
+  extra:"Ekstra", add_extra:"+ Tilføj ekstra træning", confirm:"Bekræft",
+  upload_screenshot_opt:"Upload screenshot (valgfrit)", save_extra:"Gem ekstra træning", cancel:"Afbryd",
+  this_week:"Denne uge", next_week:"Næste uge",
+  mark_done:"Marker gennemført · {km} km", planned:"/ {km} km planlagt",
+  ph_name:"Navn (fx Løbetur)", ph_km:"Km",
+  phases_title:"Hvad betyder faserne?",
+  ph_base_d:"Opbygger det aerobe fundament — lav intensitet, høj volumen.",
+  ph_build_d:"Intervaller og tempo-ture forbereder kroppen til race-pace.",
+  ph_peak_d:"Maksimal belastning. Du er nu på dit allerstærkeste.",
+  ph_taper_d:"Reduceret volumen — kroppen hviler og lader op til løbet.",
+  ph_race_d:"Friske ben og fokus. Det er dit løb nu.",
+  import_title:"Importér fra screenshot",
+  import_body:"Upload et screenshot fra Strava, Garmin, Polar eller lignende — vi finder dine aktiviteter automatisk.",
+  choose_image:"Vælg billede", import_formats:"PNG, JPG eller WebP · Strava, Garmin, Polar og mere",
+  analysing:"Analyserer billede…", log_it:"Log den", match_activities:"Match dine aktiviteter til træninger:",
+  stat_km:"Km kørt", stat_sessions:"Træninger", stat_longest:"Længste tur", stat_weeks_left:"Uger til turen",
+  stat_km_week:"Km pr. uge", stat_phase_progress:"Fase-fremdrift",
+  reset_progress:"Nulstil fremdrift", delete_plan:"Slet plan",
+  logged:"✓ Logget", log_short:"Log", prev_week:"Forrige uge",
+  weeks_in:"Om {n} uger", weeks_ago:"{n} uger siden", finished:"Færdig",
+  sure_again:"⚠ Sikker? Tryk igen", sure_delete:"⚠ Sikker? Tryk igen for at slette",
+  days:["Man","Tir","Ons","Tor","Fre","Lør","Søn"], locale:"da-DK",
+  sport_cykling:"Cykling", sport_lob:"Løb", sport_svomning:"Svømning",
+  goal_cykling:"cykelløb", goal_lob:"løb", goal_svomning:"svømning",
+  ivl_cykling:["3x10 min sweet spot","4x12 min sweet spot","4x15 min sweet spot","3x20 min sweet spot"],
+  ivl_lob:["4x4 min ved tærskelfart","5x5 min ved tærskelfart","3x8 min ved tærskelfart","2x15 min ved tærskelfart"],
+  ivl_svomning:["8x100m, 20 sek pause","10x100m, 15 sek pause","6x200m, 30 sek pause","4x300m, 30 sek pause"],
+  sn_cykling:{support:["Zone 2-tur","Intervaltræning","Restitutionstur","Zone 2-tur"],long:"Lang tur",event:"Løbsdag",b2b0:"Lang tur (dag 1)",b2b1:"Rolig tur (dag 2)"},
+  sn_lob:{support:["Rolig løbetur","Tempotræning","Restitutionsjog","Rolig løbetur"],long:"Lang tur",event:"Løbsdag",b2b0:"Lang tur (dag 1)",b2b1:"Roligt jog (dag 2)"},
+  sn_svomning:{support:["Rolig svømning","Intervalsæt","Restitutionssvømning","Rolig svømning"],long:"Lang svømning",event:"Løbsdag",b2b0:"Lang svømning (dag 1)",b2b1:"Rolig svømning (dag 2)"},
+  note_intervals:"intervaller: {scheme}", note_veryeasy:"meget rolig",
+  note_b2b:"lige efter forrige træning, ingen hviledag imellem",
+  note_longest:"planens længste træning — fuld generalprøve på løbsdagen",
+  note_restup:"hvil ud før og efter",
+  phase_base1:"Base 1", phase_base2:"Base 2", phase_build1:"Build 1", phase_build2:"Build 2",
+  phase_peak:"Peak", phase_taper:"Taper", phase_raceweek:"Løbsuge", phase_build:"Build",
+  api_BASE:"Base", api_BUILD:"Build", api_PEAK:"Peak", api_TAPER:"Taper", "api_RACE WEEK":"Løbsuge",
+  suffix_recovery:"restitution", suffix_b2b:"to dage i træk",
+  tempo_cykling_b2b:"Meget rolig, 18-20 km/t, RPE 3. Du kører på trætte ben fra i går.",
+  tempo_cykling_int:"Rolig opvarmning/nedkøling, 20-22 km/t, RPE 3-4. Under intervaller: RPE 6-7.",
+  tempo_cykling_long_far:"Meget rolig, 19-20 km/t, RPE 3-4. Hold igen de første 60-70 km.",
+  tempo_cykling_long_near:"Rolig, 19-21 km/t, RPE 3-5. Start konservativt.",
+  tempo_cykling_veryeasy:"Meget rolig, 18-20 km/t, RPE 2-3.",
+  tempo_cykling_default:"Rolig, zone 2, 20-22 km/t, RPE 3-4.",
+  tempo_lob_b2b:"Meget rolig, snakketempo, RPE 3. Du løber på trætte ben fra i går.",
+  tempo_lob_int:"Rolig jogopvarmning 10-15 min, så tærskelintervaller, rolig nedkøling. RPE 7-8 under intervallerne.",
+  tempo_lob_long_far:"Meget rolig, snakketempo, RPE 3-4. Hold igen de første 25%.",
+  tempo_lob_long_near:"Rolig, snakketempo, RPE 3-5.",
+  tempo_lob_veryeasy:"Meget roligt jogtempo, RPE 2-3.",
+  tempo_lob_default:"Roligt jogtempo, RPE 3-4 — du skal kunne tale i hele sætninger.",
+  tempo_svomning_b2b:"Meget rolig, fokus på teknik, ingen intensitet.",
+  tempo_svomning_int:"300-400m rolig opvarmning, så intervalsæt, rolig nedkøling. RPE 6-7 i sættet.",
+  tempo_svomning_long_far:"Jævnt roligt tempo, hold teknikken hele vejen, RPE 3-5.",
+  tempo_svomning_long_near:"Jævnt roligt tempo, hold teknikken hele vejen, RPE 3-5.",
+  tempo_svomning_veryeasy:"Meget rolig, fokus på teknik, RPE 2-3.",
+  tempo_svomning_default:"Rolig, fokus på teknik, RPE 3-4.",
+  nut_cykling_200:"Kendt morgenmad inden start. Vand undervejs, 60-90 g kulhydrat i timen, elektrolytter.",
+  nut_cykling_100:"Jævn væskeindtagelse + elektrolytter. 60-90 g kulhydrat i timen fra start.",
+  nut_cykling_70:"Jævn væskeindtagelse. 1-2 gels, ca. 40-60 g kulhydrat i timen efter den første time.",
+  nut_cykling_40:"Tag vand med. Overvej en energibar hvis turen nærmer sig 90 min.",
+  nut_cykling_0:"Kun vand.",
+  nut_lob_30:"Vand + elektrolytter undervejs. 30-60 g kulhydrat i timen fra start.",
+  nut_lob_18:"Vand undervejs. 1 gel efter 60 min, derefter ca. 30-40 g kulhydrat i timen.",
+  nut_lob_10:"Vand er nok — måske en slurk eller to hvis det er varmt.",
+  nut_lob_0:"Kun vand.",
+  nut_svomning_6:"Elektrolytter og energi ved pauser/vendinger hver 30-45 min.",
+  nut_svomning_3:"Vand ved pauser. Overvej energi hvis du svømmer over 60 min i træk.",
+  nut_svomning_0:"Vand ved pauser er nok.",
+}
+};
+
+// localStorage, not window.storage: the choice is per-device and the first
+// paint needs it synchronously.
+function readLang(){
+  try{const v=localStorage.getItem("rf-lang");if(v==="da"||v==="en")return v;}catch(e){}
+  try{return (navigator.language||"").toLowerCase().indexOf("da")===0?"da":"en";}catch(e){}
+  return "en";
+}
+let lang=readLang();
+function setLang(l){
+  lang=l;
+  try{localStorage.setItem("rf-lang",l);}catch(e){}
+  document.documentElement.lang=l;
+  syncLangToggle();
+  render();
+}
+function t(k,vars){
+  let str=I18N[lang][k];
+  if(str===undefined)str=I18N.en[k];
+  if(str===undefined)return k;
+  if(vars)for(const key in vars)str=str.split("{"+key+"}").join(vars[key]);
+  return str;
+}
+function syncLangToggle(){
+  const wrap=document.getElementById("langToggle");
+  if(!wrap)return;
+  wrap.querySelectorAll("button").forEach(b=>{
+    b.classList.toggle("active",b.dataset.lang===lang);
+  });
+}
+
+// tempoFn used to switch on Danish substrings inside the note ("intervaller",
+// "lige efter") while generatePlan() wrote English ones, so it always fell to
+// the default branch. Items now carry a stable kind at index 3 instead; AI
+// items have none and get the default, which is correct for a coach note.
+function tempoFor(sk,km,kind){
+  if(kind==="b2b")return t("tempo_"+sk+"_b2b");
+  if(kind==="intervals")return t("tempo_"+sk+"_int");
+  if(kind==="long"){
+    const far=sk==="cykling"?150:sk==="lob"?25:1e9;
+    return km>=far?t("tempo_"+sk+"_long_far"):t("tempo_"+sk+"_long_near");
+  }
+  if(kind==="veryeasy")return t("tempo_"+sk+"_veryeasy");
+  return t("tempo_"+sk+"_default");
+}
+function nutritionFor(sk,km){
+  const steps={cykling:[200,100,70,40],lob:[30,18,10],svomning:[6,3]}[sk];
+  for(const step of steps)if(km>=step)return t("nut_"+sk+"_"+step);
+  return t("nut_"+sk+"_0");
+}
 const SPORTS = {
   cykling: {
-    label:"Cycling",
-    intervalSchemes:["3x10 min sweet spot","4x12 min sweet spot","4x15 min sweet spot","3x20 min sweet spot"],
-    tempoFn:(label,km,note)=>{
-      const n=(note||"").toLowerCase();
-      if(n.includes("lige efter")) return "Very easy, 18-20 km/h, RPE 3. Riding on tired legs from the day before.";
-      if(n.includes("intervaller")) return "Easy warm-up/cool-down, 20-22 km/h, RPE 3-4. During intervals: RPE 6-7.";
-      if(label.includes("lang tur")||label==="The Ride") return km>=150?"Very easy, 19-20 km/h, RPE 3-4. Hold back for the first 60-70 km.":"Easy, 19-21 km/h, RPE 3-5. Start conservatively.";
-      if(n.includes("meget rolig")) return "Very easy, 18-20 km/h, RPE 2-3.";
-      return "Easy, Zone 2, 20-22 km/h, RPE 3-4.";
-    },
-    nutritionFn:(km)=>{
-      if(km>=200) return "Familiar breakfast before you start. Water throughout, 60-90 g carbs/hour, electrolytes.";
-      if(km>=100) return "Steady hydration + electrolytes. 60-90 g carbs/hour from the start.";
-      if(km>=70) return "Steady hydration. 1-2 gels, approx. 40-60 g carbs/hour after the first hour.";
-      if(km>=40) return "Bring water. Consider an energy bar if the ride approaches 90 min.";
-      return "Water only.";
-    }
+    get label(){return t("sport_cykling");},
+    get intervalSchemes(){return t("ivl_cykling");},
+    tempoFn:(label,km,note,kind)=>tempoFor("cykling",km,kind),
+    nutritionFn:(km)=>nutritionFor("cykling",km)
   },
   lob: {
-    label:"Running",
-    intervalSchemes:["4x4 min at threshold pace","5x5 min at threshold pace","3x8 min at threshold pace","2x15 min at threshold pace"],
-    tempoFn:(label,km,note)=>{
-      const n=(note||"").toLowerCase();
-      if(n.includes("lige efter")) return "Very easy, conversational pace, RPE 3. Running on tired legs from the day before.";
-      if(n.includes("intervaller")) return "Easy jog warm-up 10-15 min, then threshold intervals, easy cool-down. RPE 7-8 during intervals.";
-      if(label.includes("lang tur")||label==="The Ride") return km>=25?"Very easy, conversational pace, RPE 3-4. Hold back for the first 25%.":"Easy, conversational pace, RPE 3-5.";
-      if(n.includes("meget rolig")) return "Very easy jog pace, RPE 2-3.";
-      return "Easy jog pace, RPE 3-4 — you should be able to speak in full sentences.";
-    },
-    nutritionFn:(km)=>{
-      if(km>=30) return "Water + electrolytes throughout. 30-60 g carbs/hour from the start.";
-      if(km>=18) return "Water throughout. 1 gel after 60 min, approx. 30-40 g carbs/hour after that.";
-      if(km>=10) return "Water is enough — maybe a sip or two if it's hot.";
-      return "Water only.";
-    }
+    get label(){return t("sport_lob");},
+    get intervalSchemes(){return t("ivl_lob");},
+    tempoFn:(label,km,note,kind)=>tempoFor("lob",km,kind),
+    nutritionFn:(km)=>nutritionFor("lob",km)
   },
   svomning: {
-    label:"Swimming",
-    intervalSchemes:["8x100m, 20 sec rest","10x100m, 15 sec rest","6x200m, 30 sec rest","4x300m, 30 sec rest"],
-    tempoFn:(label,km,note)=>{
-      const n=(note||"").toLowerCase();
-      if(n.includes("lige efter")) return "Very easy, technique focus, no intensity.";
-      if(n.includes("intervaller")) return "300-400m easy warm-up, then interval set, easy cool-down. RPE 6-7 during the set.";
-      if(label.includes("lang tur")||label==="The Ride") return "Steady easy pace, focus on maintaining technique throughout, RPE 3-5.";
-      if(n.includes("meget rolig")) return "Very easy, technique focus, RPE 2-3.";
-      return "Easy, technique focus, RPE 3-4.";
-    },
-    nutritionFn:(km)=>{
-      if(km>=6) return "Electrolytes and fuel at rest stops/turns every 30-45 min.";
-      if(km>=3) return "Water at rest stops. Consider some fuel if swimming continuously for over 60 min.";
-      return "Water at rest stops is enough.";
-    }
+    get label(){return t("sport_svomning");},
+    get intervalSchemes(){return t("ivl_svomning");},
+    tempoFn:(label,km,note,kind)=>tempoFor("svomning",km,kind),
+    nutritionFn:(km)=>nutritionFor("svomning",km)
   }
 };
 
@@ -998,8 +1279,8 @@ function roundStep(x,target){
   return Math.max(step,Math.round(x/step)*step);
 }
 function supportFractions(count){
-  const t={0:[],1:[0.35],2:[0.28,0.36],3:[0.25,0.30,0.36],4:[0.22,0.26,0.30,0.36]};
-  return t[count]||t[3];
+  const table={0:[],1:[0.35],2:[0.28,0.36],3:[0.25,0.30,0.36],4:[0.22,0.26,0.30,0.36]};
+  return table[count]||table[3];
 }
 function generatePlan(sportKey,targetKm,weeksAvailable,sessionsPerWeek,currentLongest,minSession){
   minSession=minSession||0;
@@ -1012,12 +1293,7 @@ function generatePlan(sportKey,targetKm,weeksAvailable,sessionsPerWeek,currentLo
   const scheme=SPORTS[sportKey].intervalSchemes;
   const weeks=[];
 
-  const SNAMES={
-    cykling:{support:["Zone 2 ride","Interval session","Recovery ride","Zone 2 ride"],long:"Long ride",event:"Race day",b2b0:"Long ride (day 1)",b2b1:"Easy ride (day 2)"},
-    lob:{support:["Easy run","Tempo session","Recovery jog","Easy run"],long:"Long run",event:"Race day",b2b0:"Long run (day 1)",b2b1:"Easy jog (day 2)"},
-    svomning:{support:["Easy swim","Interval set","Recovery swim","Easy swim"],long:"Long swim",event:"Race day",b2b0:"Long swim (day 1)",b2b1:"Easy swim (day 2)"}
-  };
-  const SN=SNAMES[sportKey]||SNAMES.cykling;
+  const SN=t("sn_"+sportKey);
 
   function buildItems(longKm,opts){
     opts=opts||{};
@@ -1025,18 +1301,19 @@ function generatePlan(sportKey,targetKm,weeksAvailable,sessionsPerWeek,currentLo
     const fracs=opts.support!=null?opts.support:supFracs;
     fracs.forEach((f,i)=>{
       let note=null;
-      const label=opts.veryEasy?"Recovery":(opts.intervalIdx!=null&&i===0?SN.support[1]:SN.support[i]||SN.support[0]);
-      if(opts.intervalIdx!=null&&i===0) note="intervals: "+scheme[opts.intervalIdx%scheme.length];
-      else if(opts.veryEasy) note="very easy";
-      items.push([label,rnd(longKm*f),note]);
+      const label=opts.veryEasy?SN.support[2]:(opts.intervalIdx!=null&&i===0?SN.support[1]:SN.support[i]||SN.support[0]);
+      let kind=null;
+      if(opts.intervalIdx!=null&&i===0){note=t("note_intervals",{scheme:scheme[opts.intervalIdx%scheme.length]});kind="intervals";}
+      else if(opts.veryEasy){note=t("note_veryeasy");kind="veryeasy";}
+      items.push([label,rnd(longKm*f),note,kind]);
     });
     if(opts.backToBack){
-      items.push([SN.b2b0,rnd(longKm*0.78)]);
-      items.push([SN.b2b1,rnd(longKm*0.58),"right after previous session, no rest day in between"]);
+      items.push([SN.b2b0,rnd(longKm*0.78),null,"long"]);
+      items.push([SN.b2b1,rnd(longKm*0.58),t("note_b2b"),"b2b"]);
     } else if(opts.isEvent){
-      items.push([SN.event,targetKm,opts.eventNote||null]);
+      items.push([SN.event,targetKm,opts.eventNote||null,"long"]);
     } else {
-      items.push([SN.long,rnd(longKm),opts.longNote||null]);
+      items.push([SN.long,rnd(longKm),opts.longNote||null,"long"]);
     }
     return items;
   }
@@ -1046,13 +1323,13 @@ function generatePlan(sportKey,targetKm,weeksAvailable,sessionsPerWeek,currentLo
     const buildCount=weeksAvailable-taperCount;
     for(let w=0;w<buildCount;w++){
       const lk=rnd(startLong+(peak*0.55-startLong)*(buildCount<=1?1:w/(buildCount-1)));
-      weeks.push({phase:"Build",items:buildItems(lk,{})});
+      weeks.push({phase:t("phase_build"),items:buildItems(lk,{})});
     }
-    for(let t=0;t<taperCount;t++){
-      const isLast=t===taperCount-1;
-      const lk=rnd(peak*0.55*(1-t*0.4));
-      if(isLast) weeks.push({phase:"Race Week",items:buildItems(lk*0.4,{support:[0.3],isEvent:true})});
-      else weeks.push({phase:"Taper",items:buildItems(lk,{veryEasy:true})});
+    for(let ti=0;ti<taperCount;ti++){
+      const isLast=ti===taperCount-1;
+      const lk=rnd(peak*0.55*(1-ti*0.4));
+      if(isLast) weeks.push({phase:t("phase_raceweek"),items:buildItems(lk*0.4,{support:[0.3],isEvent:true})});
+      else weeks.push({phase:t("phase_taper"),items:buildItems(lk,{veryEasy:true})});
     }
     return weeks;
   }
@@ -1082,29 +1359,75 @@ function generatePlan(sportKey,targetKm,weeksAvailable,sessionsPerWeek,currentLo
   const firstIntervalWeekPos=Math.max(1,Math.floor(loadOrder.length*0.15));
   blockPattern.forEach((w,i)=>{
     const posInLoad=loadOrder.indexOf(i);
-    const t=loadOrder.length<=1?1:posInLoad/(loadOrder.length-1);
-    const lk=rnd(startLong+(peak-startLong)*t);
-    if(w.isPeak){weeks.push({phase:"Peak",items:buildItems(peak,{support:supFracs.map(f=>f*0.75),longNote:"plan's longest session — a full dress rehearsal for race day"})});return;}
-    if(w.type==="recovery"){weeks.push({phase:phaseName(i,numBlocks,leftover)+" · recovery",items:buildItems(rnd(lk*0.55),{})});return;}
-    if(b2bIndices.includes(i)){weeks.push({phase:phaseName(i,numBlocks,leftover)+" · back-to-back",items:buildItems(lk,{backToBack:true})});return;}
+    const ramp=loadOrder.length<=1?1:posInLoad/(loadOrder.length-1);
+    const lk=rnd(startLong+(peak-startLong)*ramp);
+    if(w.isPeak){weeks.push({phase:t("phase_peak"),items:buildItems(peak,{support:supFracs.map(f=>f*0.75),longNote:t("note_longest")})});return;}
+    if(w.type==="recovery"){weeks.push({phase:phaseName(i,numBlocks,leftover)+" · "+t("suffix_recovery"),items:buildItems(rnd(lk*0.55),{})});return;}
+    if(b2bIndices.includes(i)){weeks.push({phase:phaseName(i,numBlocks,leftover)+" · "+t("suffix_b2b"),items:buildItems(lk,{backToBack:true})});return;}
     let intervalIdx=null;
     if(posInLoad>=firstIntervalWeekPos){intervalIdx=intervalCounter%scheme.length;intervalCounter++;}
     weeks.push({phase:phaseName(i,numBlocks,leftover),items:buildItems(lk,{intervalIdx})});
   });
-  for(let t=0;t<taperWeeks;t++){
-    const isLast=t===taperWeeks-1;
-    const lk=rnd(peak*(0.6-0.18*t));
-    if(isLast) weeks.push({phase:"Race Week",items:buildItems(rnd(targetKm*0.12),{support:[0.3],isEvent:true,eventNote:"rest up before and after"})});
-    else weeks.push({phase:"Taper",items:buildItems(lk,{})});
+  for(let ti=0;ti<taperWeeks;ti++){
+    const isLast=ti===taperWeeks-1;
+    const lk=rnd(peak*(0.6-0.18*ti));
+    if(isLast) weeks.push({phase:t("phase_raceweek"),items:buildItems(rnd(targetKm*0.12),{support:[0.3],isEvent:true,eventNote:t("note_restup")})});
+    else weeks.push({phase:t("phase_taper"),items:buildItems(lk,{})});
   }
   return weeks;
 }
 function phaseName(i,numBlocks,leftover){
-  if(i<leftover) return "Base 1";
+  if(i<leftover) return t("phase_base1");
   const blockIdx=Math.floor((i-leftover)/4);
-  const names=["Base 1","Base 2","Build 1","Build 2","Peak"];
+  const names=[t("phase_base1"),t("phase_base2"),t("phase_build1"),t("phase_build2"),t("phase_peak")];
   const scaledIdx=numBlocks<=1?0:Math.floor(blockIdx*(names.length-1)/(numBlocks-1));
   return names[Math.min(scaledIdx,names.length-1)];
+}
+
+/* ---------------- AI PLAN MAPPING ---------------- */
+// The app stores sport as ASCII keys (cykling/lob/svomning) — they double as
+// object keys and DOM data attributes. /api/generate accepts those keys but
+// answers in canonical Danish, and returns only {label, sport, weeks}; every
+// other field on a plan object comes from the wizard.
+const API_SPORT_KEYS={"cykling":"cykling","løb":"lob","svømning":"svomning"};
+// Measured: ~14-16s for 12 weeks, ~35s for 24. The server times out at 40s per
+// attempt and retries once, so a real answer can take ~80s. Give up after that
+// and use the local algorithm instead of leaving the user on a spinner.
+const AI_GENERATE_TIMEOUT_MS=95000;
+
+// The API answers with a fixed upper-case phase vocabulary (BASE … RACE WEEK);
+// generatePlan() writes localized names. The phase accordion groups weeks by
+// this string, so both paths resolve through the same keys — otherwise a Danish
+// AI plan would show "Race Week" next to a Danish fallback plan's "Løbsuge".
+function apiPhaseName(p){
+  const key="api_"+String(p||"").toUpperCase();
+  const hit=I18N[lang][key]||I18N.en[key];
+  return hit||String(p||"").toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
+}
+
+function apiPlanToLocalPlan(apiPlan,wiz){
+  const sportKey=API_SPORT_KEYS[apiPlan.sport]||wiz.sport;
+  return {
+    id:"p"+Date.now(),
+    sport:sportKey,
+    label:wiz.target+" km "+SPORTS[sportKey].label.toLowerCase(),
+    aiLabel:typeof apiPlan.label==="string"?apiPlan.label:null,
+    target:wiz.target,
+    // Not wiz.weeksAvailable: the API caps plans at 24 weeks, so the plan that
+    // comes back can be shorter than what the wizard asked for. Week dates are
+    // derived from this field, so it must match the weeks that actually exist.
+    weeksAvailable:apiPlan.weeks.length,
+    sessionsPerWeek:wiz.sessionsPerWeek,
+    startDate:wiz.startDate,
+    createdAt:new Date().toISOString().slice(0,10),
+    generatedBy:"ai",
+    capped:apiPlan.capped===true,
+    weeks:apiPlan.weeks.map(w=>({
+      phase:apiPhaseName(w.phase),
+      items:w.items.map(it=>[String(it[0]),Number(it[1]),it[2]||null])
+    })),
+    progress:{}
+  };
 }
 
 /* ---------------- STORAGE ---------------- */
@@ -1133,22 +1456,22 @@ function getSessionDate(plan,wIdx,sIdx){
 }
 function fmtDate(d){
   if(!d)return"";
-  return d.toLocaleDateString("da-DK",{weekday:"short",day:"numeric",month:"short"});
+  return d.toLocaleDateString(t("locale"),{weekday:"short",day:"numeric",month:"short"});
 }
 function isToday(d){
   if(!d)return false;
-  const t=new Date();
-  return d.getFullYear()===t.getFullYear()&&d.getMonth()===t.getMonth()&&d.getDate()===t.getDate();
+  const now=new Date();
+  return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()&&d.getDate()===now.getDate();
 }
 function isFuture(d){
   if(!d)return false;
-  const t=new Date();t.setHours(0,0,0,0);
+  const today=new Date();today.setHours(0,0,0,0);
   const dc=new Date(d);dc.setHours(0,0,0,0);
-  return dc>t;
+  return dc>today;
 }
 
 /* ---------------- STATE ---------------- */
-let state={view:"library",planIndex:[],activePlan:null,wizardSport:"cykling",planCache:{}};
+let state={view:"library",planIndex:[],activePlan:null,wizardSport:"cykling",wizardFitness:"Motionist",planCache:{}};
 const app=document.getElementById("app");
 
 /* ---------------- LIBRARY ---------------- */
@@ -1156,18 +1479,7 @@ function renderLibrary(loading){
   const idx=state.planIndex;
   const hasPlans=!loading&&idx.length>0;
 
-  const tickerQuotes=[
-    "Consistency beats perfection",
-    "Every session counts",
-    "Rest is part of the plan",
-    "Train to the line",
-    "Miles make champions",
-    "Show up. Do the work. Repeat",
-    "You don't find the finish line — you earn it",
-    "One more week. One more session",
-    "Fatigue is temporary. Fitness is permanent",
-    "The best plan is the one you follow",
-  ];
+  const tickerQuotes=[1,2,3,4,5,6,7,8,9,10].map(i=>t("tick_"+i));
   const tickerContent=tickerQuotes.map(q=>`<span class="ticker-item">${q}<span class="ticker-sep">✦</span></span>`).join("");
 
   let heroHtml=`
@@ -1178,7 +1490,7 @@ function renderLibrary(loading){
       </video>
       <img class="hero-fallback-img" id="heroFallbackImg" src="hero-fallback.jpg" alt="" style="display:none;">
       <div class="hero-scrim"></div>
-      <button class="hero-video-toggle" id="heroVideoToggle" aria-label="Pause video">
+      <button class="hero-video-toggle" id="heroVideoToggle" aria-label="${t("pause_video")}">
         <svg viewBox="0 0 16 16"><rect x="4" y="2" width="3" height="12"/><rect x="9" y="2" width="3" height="12"/></svg>
       </button>
       <div class="hero-wordmark">
@@ -1187,12 +1499,12 @@ function renderLibrary(loading){
         </div>
         <span class="hero-wordmark-text">Range Finder</span>
       </div>
-      <p class="hero-eyebrow">AI-coached training plans</p>
-      <h1>Your season,<br>structured.</h1>
-      <p class="hero-sub">Upload a screenshot of your recent activities and get a personalised 4-week training plan — no coach, no complex software.</p>
+      <p class="hero-eyebrow">${t("hero_eyebrow")}</p>
+      <h1>${t("hero_h1")}</h1>
+      <p class="hero-sub">${t("hero_sub")}</p>
       <div class="hero-actions">
-        <button class="btn" id="newPlanBtn">Build my plan →</button>
-        <span class="hero-cta-note">Free to start</span>
+        <button class="btn" id="newPlanBtn">${t("hero_cta")}</button>
+        <span class="hero-cta-note">${t("hero_cta_note")}</span>
       </div>
     </div>
     <div class="proof-strip">
@@ -1201,18 +1513,18 @@ function renderLibrary(loading){
         <div class="proof-avatar"></div>
         <div class="proof-avatar"></div>
       </div>
-      <p class="proof-text"><strong>For cyclists, runners &amp; triathletes</strong> training 5–10 hrs/week without a coach</p>
+      <p class="proof-text">${t("proof_text")}</p>
     </div>
   `;
 
   let plansHtml="";
   if(loading){
-    plansHtml=`<div class="loading">Loading your plans…</div>`;
+    plansHtml=`<div class="loading">${t("loading_plans")}</div>`;
   } else if(idx.length===0){
     plansHtml=`
       <div class="plans-section">
         <div class="plans-header">
-          <span>My plans</span>
+          <span>${t("my_plans")}</span>
         </div>
         <div style="padding:16px 0 0;">
           <div class="ghost-card">
@@ -1223,8 +1535,8 @@ function renderLibrary(loading){
             </div>
           </div>
           <div class="empty-state">
-            <strong>No plans yet</strong>
-            Upload a screenshot above to generate your first training plan.
+            <strong>${t("no_plans")}</strong>
+            ${t("no_plans_sub")}
           </div>
         </div>
       </div>
@@ -1236,7 +1548,7 @@ function renderLibrary(loading){
         <div class="plan-card-body">
           <div class="plan-card-sport">${SPORTS[p.sport].label}</div>
           <div class="plan-card-title">${p.label}</div>
-          <div class="plan-card-meta">${p.weeksAvailable} weeks · ${p.sessionsPerWeek} sessions/week · ${p.createdAt}</div>
+          <div class="plan-card-meta">${t("card_meta",{w:p.weeksAvailable,s:p.sessionsPerWeek,d:p.createdAt})}</div>
         </div>
         <div class="plan-card-arrow">→</div>
       </div>
@@ -1245,8 +1557,8 @@ function renderLibrary(loading){
     plansHtml=`
       <div class="plans-section">
         <div class="plans-header" id="plansAnchor">
-          <span>My plans</span>
-          <button class="btn-outline" id="newPlanBtn2">+ New plan</button>
+          <span>${t("my_plans")}</span>
+          <button class="btn-outline" id="newPlanBtn2">${t("new_plan")}</button>
         </div>
         ${cards}
       </div>
@@ -1255,19 +1567,19 @@ function renderLibrary(loading){
 
   const howHtml=loading?"":`
     <details class="how-dropdown" ${idx.length===0?"open":""}>
-      <summary class="how-toggle">How it works</summary>
+      <summary class="how-toggle">${t("how_it_works")}</summary>
       <div class="how-body">
         <div class="how-item">
           <span class="how-num">1</span>
-          <p class="how-text"><strong>Upload a screenshot</strong>Your Strava, Garmin, or Apple Fitness feed — 2–4 weeks of history is enough.</p>
+          <p class="how-text"><strong>${t("hiw_1_t")}</strong>${t("hiw_1_b")}</p>
         </div>
         <div class="how-item">
           <span class="how-num">2</span>
-          <p class="how-text"><strong>Get a 4-week plan</strong>Structured sessions: easy runs, threshold work, long rides. Calibrated to what you've been doing.</p>
+          <p class="how-text"><strong>${t("hiw_2_t")}</strong>${t("hiw_2_b")}</p>
         </div>
         <div class="how-item">
           <span class="how-num">3</span>
-          <p class="how-text"><strong>Check off each session</strong>Your plan lives in the app. Tick sessions as you go. Regenerate when life happens.</p>
+          <p class="how-text"><strong>${t("hiw_3_t")}</strong>${t("hiw_3_b")}</p>
         </div>
       </div>
     </details>
@@ -1320,64 +1632,72 @@ function renderLibrary(loading){
 
 /* ---------------- WIZARD ---------------- */
 const MIN_SESSION_OPTIONS={cykling:[0,10,15,20,25,30,40],lob:[0,2,3,5,8,10],svomning:[0,0.5,1,1.5,2,3]};
-const WEEKS_OPTIONS=[{v:1,l:"1 week"},{v:2,l:"2 weeks"},{v:4,l:"4 weeks (1 month)"},{v:8,l:"8 weeks (2 months)"},{v:12,l:"12 weeks (3 months)"},{v:16,l:"16 weeks (4 months)"},{v:20,l:"20 weeks (5 months)"},{v:24,l:"24 weeks (6 months)"},{v:36,l:"36 weeks (9 months)"},{v:52,l:"52 weeks (1 year)"}];
+// Values are the exact strings /api/generate validates; the labels stay English
+// like the rest of the wizard.
+const FITNESS_OPTIONS=[{v:"Begynder",k:"fit_beginner"},{v:"Motionist",k:"fit_intermediate"},{v:"Erfaren",k:"fit_experienced"},{v:"Konkurrerende",k:"fit_competitive"}];
+const WEEKS_OPTIONS=[1,2,4,8,12,16,20,24,36,52];
 
 function renderWizard(){
   const sportIcons={cykling:"🚴",lob:"🏃",svomning:"🏊"};
   app.innerHTML=`
     <div class="page-header">
       <div class="page-header-left">
-        <h1>NEW PLAN</h1>
+        <h1>${t("wizard_title")}</h1>
       </div>
-      <button class="backlink" id="backLib">← Back</button>
+      <button class="backlink" id="backLib">${t("back")}</button>
     </div>
     <div class="wizard-body">
 
       <div style="padding-top:24px;margin-bottom:4px;">
-        <p class="wizard-section-label">Your sport</p>
+        <p class="wizard-section-label">${t("your_sport")}</p>
         <div class="sport-cards" id="sportChoice">
           <div class="sport-card ${state.wizardSport==="cykling"?"active":""}" data-sport="cykling">
             <span class="sport-card-icon">${sportIcons.cykling}</span>
-            <span class="sport-card-label">Cycling</span>
+            <span class="sport-card-label">${t("sport_cykling")}</span>
           </div>
           <div class="sport-card ${state.wizardSport==="lob"?"active":""}" data-sport="lob">
             <span class="sport-card-icon">${sportIcons.lob}</span>
-            <span class="sport-card-label">Running</span>
+            <span class="sport-card-label">${t("sport_lob")}</span>
           </div>
           <div class="sport-card ${state.wizardSport==="svomning"?"active":""}" data-sport="svomning">
             <span class="sport-card-icon">${sportIcons.svomning}</span>
-            <span class="sport-card-label">Swimming</span>
+            <span class="sport-card-label">${t("sport_svomning")}</span>
           </div>
         </div>
       </div>
 
       <div class="field">
-        <label>Target distance (km)</label>
-        <input type="number" id="wTarget" placeholder="e.g. 200" inputmode="decimal">
+        <label>${t("fitness_level")}</label>
+        <select id="wFitness">${FITNESS_OPTIONS.map(o=>`<option value="${o.v}" ${o.v===state.wizardFitness?"selected":""}>${t(o.k)}</option>`).join("")}</select>
+      </div>
+
+      <div class="field">
+        <label>${t("target_distance")}</label>
+        <input type="number" id="wTarget" placeholder="${t("ph_200")}" inputmode="decimal">
       </div>
       <div class="field">
-        <label>Time available</label>
-        <select id="wWeeks">${WEEKS_OPTIONS.map(o=>`<option value="${o.v}" ${o.v===24?"selected":""}>${o.l}</option>`).join("")}</select>
+        <label>${t("time_available")}</label>
+        <select id="wWeeks">${WEEKS_OPTIONS.map(v=>`<option value="${v}" ${v===24?"selected":""}>${t("weeks_"+v)}</option>`).join("")}</select>
       </div>
       <div class="field">
-        <label>Sessions per week</label>
-        <input type="number" id="wSessions" placeholder="e.g. 3" inputmode="numeric" value="3">
+        <label>${t("sessions_per_week")}</label>
+        <input type="number" id="wSessions" placeholder="${t("ph_3")}" inputmode="numeric" value="3">
       </div>
       <div class="field">
-        <label>Start date</label>
+        <label>${t("start_date")}</label>
         <input type="date" id="wStartDate" value="${new Date().toISOString().slice(0,10)}">
       </div>
       <div class="field">
-        <label>Minimum session length</label>
-        <select id="wMinSession">${MIN_SESSION_OPTIONS[state.wizardSport].map(v=>`<option value="${v}">${v===0?"No minimum":v+" km"}</option>`).join("")}</select>
+        <label>${t("min_session")}</label>
+        <select id="wMinSession">${MIN_SESSION_OPTIONS[state.wizardSport].map(v=>`<option value="${v}">${v===0?t("no_minimum"):v+" km"}</option>`).join("")}</select>
       </div>
       <div class="field">
-        <label>Current longest session (km, optional)</label>
-        <input type="number" id="wLongest" placeholder="e.g. 80" inputmode="decimal">
+        <label>${t("current_longest")}</label>
+        <input type="number" id="wLongest" placeholder="${t("ph_80")}" inputmode="decimal">
       </div>
 
       <div class="wizard-actions">
-        <button class="btn" id="generateBtn">Generate plan →</button>
+        <button class="btn" id="generateBtn">${t("generate_plan")}</button>
       </div>
     </div>
   `;
@@ -1385,6 +1705,7 @@ function renderWizard(){
   document.getElementById("sportChoice").querySelectorAll(".sport-card").forEach(b=>{
     b.onclick=()=>{state.wizardSport=b.dataset.sport;renderWizard();};
   });
+  document.getElementById("wFitness").onchange=(e)=>{state.wizardFitness=e.target.value;};
   document.getElementById("generateBtn").onclick=async()=>{
     const target=parseFloat(document.getElementById("wTarget").value);
     const weeksAvail=parseInt(document.getElementById("wWeeks").value);
@@ -1392,19 +1713,16 @@ function renderWizard(){
     const minSession=parseFloat(document.getElementById("wMinSession").value)||0;
     const longest=parseFloat(document.getElementById("wLongest").value)||0;
     const startDate=document.getElementById("wStartDate").value||new Date().toISOString().slice(0,10);
-    if(!target||!weeksAvail){alertInline("generateBtn","Enter a target distance and number of weeks.");return;}
+    const fitness=document.getElementById("wFitness").value;
+    if(!target||!weeksAvail){alertInline("generateBtn",t("err_target"));return;}
 
-    const loadingMessages=[
-      "Analyserer din træningshistorik…",
-      "Beregner faseopdeling…",
-      "Bygger ugentlig struktur…",
-      "Skriver coach-noter…",
-      "Sidste finpudsning…",
-    ];
+    const loadingMessages=[1,2,3,4,5].map(i=>t("load_"+i));
+    // Replacing the whole view also removes the button from the DOM, which is
+    // what makes a second submit impossible while this runs.
     app.innerHTML=`
       <div class="generate-loading">
         <div class="generate-spinner"></div>
-        <div class="generate-loading-title">Din AI-coach tænker…</div>
+        <div class="generate-loading-title">${t("ai_thinking")}</div>
         <div class="generate-loading-sub" id="genLoadingSub">${loadingMessages[0]}</div>
       </div>
     `;
@@ -1415,15 +1733,57 @@ function renderWizard(){
       if(subEl)subEl.textContent=loadingMessages[msgIdx];
     },2000);
 
-    await new Promise(resolve=>setTimeout(resolve,8000));
+    // The loading screen now waits for the real answer instead of a fixed timer.
+    let plan=null,notice=null;
+    try{
+      const ctrl=new AbortController();
+      const abortTimer=setTimeout(()=>ctrl.abort(),AI_GENERATE_TIMEOUT_MS);
+      let res;
+      try{
+        res=await fetch("/api/generate",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            sport:state.wizardSport, // the API accepts the app's ASCII sport keys
+            fitness_level:fitness,
+            longest_session_km:longest,
+            target_km:target,
+            sessions_per_week:sessions,
+            plan_weeks:weeksAvail,
+            // free text in the prompt, but built from the wizard's own numbers — nothing to inject through
+            goal_event:target+" km "+t("goal_"+state.wizardSport),
+            language:lang
+          }),
+          signal:ctrl.signal
+        });
+      }finally{clearTimeout(abortTimer);}
+      if(res.ok){
+        plan=apiPlanToLocalPlan(await res.json(),{sport:state.wizardSport,target,sessionsPerWeek:sessions,startDate});
+        // WEEKS_OPTIONS goes to 52 weeks but the API caps plans at 24, so say so
+        // rather than silently handing back a shorter plan than was asked for.
+        if(plan.capped)notice=t("notice_capped",{n:plan.weeksAvailable});
+      }else{
+        let err=null;try{err=await res.json();}catch(e){}
+        console.warn("[generate] HTTP "+res.status+" "+((err&&err.error)||""));
+        if(res.status===429)notice=t("notice_ratelimit");
+      }
+    }catch(e){
+      // Network failure, the abort above, or a malformed plan — all fall back.
+      console.warn("[generate] "+(e&&e.name==="AbortError"?"timed out after "+AI_GENERATE_TIMEOUT_MS+"ms":e));
+    }
+
     clearInterval(msgInterval);
 
-    const weeks=generatePlan(state.wizardSport,target,weeksAvail,sessions,longest,minSession);
-    const id="p"+Date.now();
-    const plan={id,sport:state.wizardSport,label:target+" km "+SPORTS[state.wizardSport].label.toLowerCase(),target,weeksAvailable:weeksAvail,sessionsPerWeek:sessions,startDate,createdAt:new Date().toISOString().slice(0,10),weeks,progress:{}};
+    if(!plan){
+      if(!notice)notice=t("notice_fallback");
+      const weeks=generatePlan(state.wizardSport,target,weeksAvail,sessions,longest,minSession);
+      plan={id:"p"+Date.now(),sport:state.wizardSport,label:target+" km "+SPORTS[state.wizardSport].label.toLowerCase(),target,weeksAvailable:weeksAvail,sessionsPerWeek:sessions,startDate,createdAt:new Date().toISOString().slice(0,10),generatedBy:"algorithm",weeks,progress:{}};
+    }
+
+    planNotice=notice;
     await savePlan(plan);
     state.planCache[plan.id]=plan;
-    state.planIndex.push({id,sport:plan.sport,label:plan.label,weeksAvailable:weeksAvail,sessionsPerWeek:sessions,createdAt:plan.createdAt});
+    state.planIndex.push({id:plan.id,sport:plan.sport,label:plan.label,weeksAvailable:plan.weeksAvailable,sessionsPerWeek:plan.sessionsPerWeek,createdAt:plan.createdAt});
     await saveIndex(state.planIndex);
     state.activePlan=plan;state.view="plan";render();
   };
@@ -1434,6 +1794,11 @@ function alertInline(btnId,msg){const btn=document.getElementById(btnId);const o
 function keyFor(w,i){return w+"_"+i;}
 function isWeekDone(plan,wIdx){return plan.weeks[wIdx].items.every((_,i)=>plan.progress[keyFor(wIdx,i)]&&plan.progress[keyFor(wIdx,i)].done);}
 function isWeekPartial(plan,wIdx){return plan.weeks[wIdx].items.some((_,i)=>plan.progress[keyFor(wIdx,i)]&&plan.progress[keyFor(wIdx,i)].done);}
+// Km totals are summed from plan data. The local generator rounds every session
+// via roundStep(), but an AI plan returns whatever numbers the model picked, so
+// sums like 628.5999999999999 reach the UI. Round at display only — the stored
+// values and the km inputs stay exact.
+function fmtKm(n){return Math.round(Number(n)*10)/10;}
 function computeStats(plan){
   let ds=0,ts=0,dk=0,tk=0;
   plan.weeks.forEach((w,wIdx)=>{w.items.forEach((item,i)=>{ts++;tk+=item[1];const p=plan.progress[keyFor(wIdx,i)];if(p&&p.done){ds++;dk+=(p.actualKm!=null&&p.actualKm!=="")?Number(p.actualKm):item[1];}});});
@@ -1441,6 +1806,9 @@ function computeStats(plan){
   if(aw===-1)aw=plan.weeks.length-1;
   return{doneSessions:ds,totalSessions:ts,doneKm:dk,totalKm:tk,activeWeek:aw+1};
 }
+// Set by the wizard, shown once on the plan view it opened. Deliberately not
+// stored on the plan: it describes what just happened, not what the plan is.
+let planNotice=null;
 let openWeekIdx=null;
 let openPhaseKey=null;
 let planTab="today";
@@ -1459,15 +1827,21 @@ function renderPlanView(){
         <div class="kicker">${sport.label}</div>
         <h1>${plan.label}</h1>
       </div>
-      <button class="backlink" id="backLib">← Plans</button>
+      <button class="backlink" id="backLib">${t("back_plans")}</button>
     </div>
+    ${planNotice?`<div class="plan-notice" id="planNotice"><div>${planNotice}</div><button class="plan-notice-close" id="planNoticeClose" aria-label="${t("close")}">✕</button></div>`:""}
     <div class="plan-tabs">
-      <button class="plan-tab ${planTab==="today"?"active":""}" data-tab="today">I dag</button>
-      <button class="plan-tab ${planTab==="plan"?"active":""}" data-tab="plan">Plan</button>
-      <button class="plan-tab ${planTab==="tal"?"active":""}" data-tab="tal">Tal</button>
+      <button class="plan-tab ${planTab==="today"?"active":""}" data-tab="today">${t("tab_today")}</button>
+      <button class="plan-tab ${planTab==="plan"?"active":""}" data-tab="plan">${t("tab_plan")}</button>
+      <button class="plan-tab ${planTab==="tal"?"active":""}" data-tab="tal">${t("tab_stats")}</button>
     </div>
     <div id="tabContent"></div>
   `;
+
+  // Shown for this render only — any later full render drops it.
+  planNotice=null;
+  const noticeClose=document.getElementById("planNoticeClose");
+  if(noticeClose)noticeClose.onclick=()=>{const b=document.getElementById("planNotice");if(b)b.remove();};
 
   document.getElementById("backLib").onclick=()=>{openWeekIdx=null;openPhaseKey=null;planTab="today";state.view="library";render();};
   document.querySelectorAll(".plan-tab").forEach(btn=>{
@@ -1518,21 +1892,21 @@ function renderTabToday(plan,c){
   // Selected day card
   let cardHtml="";
   if(ts){
-    const[label,km,note]=ts.item;
+    const[label,km,note,kind]=ts.item;
     const ikey=keyFor(ts.wIdx,ts.sIdx);
     const prog=plan.progress[ikey]||{done:false,actualKm:null};
     if(prog.done){
       cardHtml=`<div class="today-card done">
         <span class="today-phase-tag">${ts.w.phase}</span>
         <div class="today-card-name">${label}</div>
-        <div class="today-card-km" style="color:rgba(255,255,255,0.6);">✓ Gennemført</div>
+        <div class="today-card-km" style="color:rgba(255,255,255,0.6);">${t("completed")}</div>
         <div style="margin-top:12px;display:flex;gap:10px;align-items:center;">
           <input id="todayActKm" type="number" inputmode="numeric" value="${prog.actualKm!=null?prog.actualKm:km}" style="width:60px;font-family:'Turret Road',sans-serif;font-size:14px;font-weight:700;border:none;border-bottom:2px solid rgba(255,255,255,0.4);background:transparent;color:#fff;padding:2px 0;">
-          <span style="font-size:12px;color:rgba(255,255,255,0.6);">/ ${km} km planlagt</span>
+          <span style="font-size:12px;color:rgba(255,255,255,0.6);">${t("planned",{km:fmtKm(km)})}</span>
         </div>
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <button class="btn btn-outline" id="todayMoveBtn" style="font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);">Flyt træning</button>
-          <button class="btn btn-outline" id="todayUndoBtn" style="font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.45);">Fortryd</button>
+          <button class="btn btn-outline" id="todayMoveBtn" style="font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);">${t("move_session")}</button>
+          <button class="btn btn-outline" id="todayUndoBtn" style="font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.45);">${t("undo")}</button>
         </div>
         <div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.4);">${fmtDate(selDate)}</div>
       </div>`;
@@ -1540,10 +1914,10 @@ function renderTabToday(plan,c){
       cardHtml=`<div class="today-card">
         <span class="today-phase-tag">${ts.w.phase}</span>
         <div class="today-card-name">${label}</div>
-        <div class="today-card-km">${km} km</div>
+        <div class="today-card-km">${fmtKm(km)} km</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn" id="todayLogBtn" style="font-size:12px;padding:10px 20px;">Log session →</button>
-          <button class="btn btn-outline" id="todayMoveBtn" style="font-size:11px;padding:6px 14px;min-height:32px;">Flyt træning</button>
+          <button class="btn" id="todayLogBtn" style="font-size:12px;padding:10px 20px;">${t("log_session")}</button>
+          <button class="btn btn-outline" id="todayMoveBtn" style="font-size:11px;padding:6px 14px;min-height:32px;">${t("move_session")}</button>
         </div>
       </div>`;
     }
@@ -1553,32 +1927,32 @@ function renderTabToday(plan,c){
     const inRange=planStart&&selDate>=planStart&&selDate<planEnd;
     const isSelToday=selDate.getTime()===today2.getTime();
     cardHtml=`<div class="today-card">
-      <div class="today-card-name">${inRange?"Hviledag":"Ingen session"}</div>
-      <div class="today-card-km" style="color:var(--subtle);">${inRange?(isSelToday?"Restitution er en del af planen.":"Fri dag — ingen træning planlagt."):"Planen starter ikke i dag."}</div>
+      <div class="today-card-name">${inRange?t("rest_day"):t("no_session")}</div>
+      <div class="today-card-km" style="color:var(--subtle);">${inRange?(isSelToday?t("rest_is_part"):t("free_day")):t("plan_not_started")}</div>
     </div>`;
   }
 
   // Guide rows (only if session found for selected day)
   let guideHtml="";
   if(ts){
-    const[label,km,note]=ts.item;
+    const[label,km,note,kind]=ts.item;
     guideHtml=`<div class="today-guide">
-      <div class="today-guide-row"><div class="today-guide-label">Tempo</div><div>${sport.tempoFn(label,km,note)}</div></div>
-      <div class="today-guide-row"><div class="today-guide-label">Ernæring</div><div>${sport.nutritionFn(km)}</div></div>
-      ${note?`<div class="today-guide-row"><div class="today-guide-label">Note</div><div>${note}</div></div>`:""}
+      <div class="today-guide-row"><div class="today-guide-label">${t("pace")}</div><div>${sport.tempoFn(label,km,note,kind)}</div></div>
+      <div class="today-guide-row"><div class="today-guide-label">${t("nutrition")}</div><div>${sport.nutritionFn(km)}</div></div>
+      ${note?`<div class="today-guide-row"><div class="today-guide-label">${t("note")}</div><div>${note}</div></div>`:""}
     </div>`;
   }
 
   // Next session card
-  const dayNames=["Man","Tir","Ons","Tor","Fre","Lør","Søn"];
+  const dayNames=t("days");
   let nextHtml="";
   if(ns){
     const[label,km]=ns.item;
     const dateStr=`${dayNames[(ns.date.getDay()+6)%7]} ${ns.date.getDate()}`;
     nextHtml=`<div class="next-session-card">
-      <div class="next-session-label">Næste træning</div>
+      <div class="next-session-label">${t("next_session")}</div>
       <div class="next-session-name">${label}</div>
-      <div class="next-session-meta">${dateStr} · ${km} km · ${ns.w.phase}</div>
+      <div class="next-session-meta">${dateStr} · ${fmtKm(km)} km · ${ns.w.phase}</div>
     </div>`;
   }
 
@@ -1588,7 +1962,7 @@ function renderTabToday(plan,c){
     plan.extras.forEach((ex,ei)=>{
       const ed=new Date(ex.date);ed.setHours(0,0,0,0);
       if(ed.getTime()===selDate.getTime()){
-        extrasForSelHtml+=`<div class="extra-session-item"><div class="extra-session-dot${ex.done?" done":""}"></div><div style="flex:1;font-size:13px;">${ex.label} · ${ex.km} km <span style="color:var(--subtle);font-size:11px;margin-left:4px;">Ekstra</span></div><button class="btn btn-outline" data-extra-log="${ei}" style="font-size:10px;padding:4px 10px;min-height:28px;">${ex.done?"✓ Logget":"Log"}</button></div>`;
+        extrasForSelHtml+=`<div class="extra-session-item"><div class="extra-session-dot${ex.done?" done":""}"></div><div style="flex:1;font-size:13px;">${ex.label} · ${fmtKm(ex.km)} km <span style="color:var(--subtle);font-size:11px;margin-left:4px;">${t("extra")}</span></div><button class="btn btn-outline" data-extra-log="${ei}" style="font-size:10px;padding:4px 10px;min-height:28px;">${ex.done?t("logged"):t("log_short")}</button></div>`;
       }
     });
   }
@@ -1596,7 +1970,7 @@ function renderTabToday(plan,c){
   // 7-day week strip — offset by viewWeekOffset weeks
   const dow=(today2.getDay()+6)%7;
   const wkStart=new Date(today2);wkStart.setDate(today2.getDate()-dow+viewWeekOffset*7);
-  const weekLabel=viewWeekOffset===0?"Denne uge":viewWeekOffset===1?"Næste uge":viewWeekOffset===-1?"Forrige uge":viewWeekOffset>0?`Om ${viewWeekOffset} uger`:`${-viewWeekOffset} uger siden`;
+  const weekLabel=viewWeekOffset===0?t("this_week"):viewWeekOffset===1?t("next_week"):viewWeekOffset===-1?t("prev_week"):viewWeekOffset>0?t("weeks_in",{n:viewWeekOffset}):t("weeks_ago",{n:-viewWeekOffset});
   let stripHtml="";
   for(let d=0;d<7;d++){
     const day=new Date(wkStart);day.setDate(wkStart.getDate()+d);day.setHours(0,0,0,0);
@@ -1614,7 +1988,7 @@ function renderTabToday(plan,c){
     stripHtml+=`<div class="strip-day${isT?" today":""}${isSel&&!hasS?" selected":""}${!isT?trainingCls:""}" data-ts="${day.getTime()}"><div class="strip-day-name">${dayNames[d]}</div><div class="strip-dot${isDone?" done":hasS?" has-session":""}"></div><div class="strip-day-num">${day.getDate()}</div></div>`;
   }
 
-  c.innerHTML=`${cardHtml}${extrasForSelHtml?`<div style="margin-top:0;">${extrasForSelHtml}</div>`:""}${guideHtml}${nextHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 24px 0;"><button id="stripPrevBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">‹</button><span style="font-family:'Turret Road',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);">${weekLabel}</span><button id="stripNextBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">›</button></div><div class="week-strip" style="margin-top:8px;">${stripHtml}</div><div class="add-extra-wrap"><button class="btn btn-outline" id="addExtraBtn" style="width:100%;font-size:12px;padding:10px;">+ Tilføj ekstra træning</button><div id="addExtraForm" style="display:none;margin-top:12px;"></div></div><div style="height:32px;"></div>`;
+  c.innerHTML=`${cardHtml}${extrasForSelHtml?`<div style="margin-top:0;">${extrasForSelHtml}</div>`:""}${guideHtml}${nextHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 24px 0;"><button id="stripPrevBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">‹</button><span style="font-family:'Turret Road',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);">${weekLabel}</span><button id="stripNextBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">›</button></div><div class="week-strip" style="margin-top:8px;">${stripHtml}</div><div class="add-extra-wrap"><button class="btn btn-outline" id="addExtraBtn" style="width:100%;font-size:12px;padding:10px;">${t("add_extra")}</button><div id="addExtraForm" style="display:none;margin-top:12px;"></div></div><div style="height:32px;"></div>`;
 
   // Wire log button
   if(ts){
@@ -1630,7 +2004,7 @@ function renderTabToday(plan,c){
     if(mb)mb.onclick=()=>{
       if(document.getElementById("moveForm"))return;
       const existOverride=plan.dateOverrides&&plan.dateOverrides[ikey]?plan.dateOverrides[ikey]:selDateStr;
-      mb.insertAdjacentHTML("afterend",`<div id="moveForm" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><input type="date" id="moveDateInput" value="${existOverride}" style="font-family:'Inter',sans-serif;font-size:13px;padding:6px 8px;border:2px solid var(--border);background:transparent;"><button class="btn" id="moveConfirmBtn" style="font-size:11px;padding:6px 14px;min-height:32px;">Bekræft</button></div>`);
+      mb.insertAdjacentHTML("afterend",`<div id="moveForm" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><input type="date" id="moveDateInput" value="${existOverride}" style="font-family:'Inter',sans-serif;font-size:13px;padding:6px 8px;border:2px solid var(--border);background:transparent;"><button class="btn" id="moveConfirmBtn" style="font-size:11px;padding:6px 14px;min-height:32px;">${t("confirm")}</button></div>`);
       document.getElementById("moveConfirmBtn").onclick=async()=>{
         const newDate=document.getElementById("moveDateInput").value;
         if(!newDate)return;
@@ -1675,19 +2049,19 @@ function renderTabToday(plan,c){
     aeb.onclick=()=>{
       aeb.style.display="none";aef.style.display="block";
       aef.innerHTML=`<div style="border:2px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <input id="extraLabel" type="text" placeholder="Navn (fx Løbetur)" style="font-family:'Inter',sans-serif;font-size:14px;font-weight:200;padding:8px;border:2px solid var(--border);background:transparent;width:100%;box-sizing:border-box;">
+        <input id="extraLabel" type="text" placeholder="${t("ph_name")}" style="font-family:'Inter',sans-serif;font-size:14px;font-weight:200;padding:8px;border:2px solid var(--border);background:transparent;width:100%;box-sizing:border-box;">
         <div style="display:flex;gap:8px;align-items:center;">
-          <input id="extraKm" type="number" inputmode="numeric" placeholder="Km" style="font-family:'Turret Road',sans-serif;font-size:14px;font-weight:700;padding:8px;border:2px solid var(--border);background:transparent;width:80px;">
+          <input id="extraKm" type="number" inputmode="numeric" placeholder="${t("ph_km")}" style="font-family:'Turret Road',sans-serif;font-size:14px;font-weight:700;padding:8px;border:2px solid var(--border);background:transparent;width:80px;">
           <input id="extraDate" type="date" value="${selDateStr}" style="font-family:'Inter',sans-serif;font-size:13px;padding:8px;border:2px solid var(--border);background:transparent;flex:1;">
         </div>
         <div id="extraUploadArea" style="border:2px dashed #ccc;padding:20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;">
           <input type="file" id="extraFile" accept="image/*" style="display:none;">
-          <div id="extraUploadLabel" style="font-size:12px;color:var(--subtle);font-weight:200;">Upload screenshot (valgfrit)</div>
+          <div id="extraUploadLabel" style="font-size:12px;color:var(--subtle);font-weight:200;">${t("upload_screenshot_opt")}</div>
           <img id="extraPreview" style="display:none;max-width:100%;margin-top:8px;max-height:120px;object-fit:contain;">
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn" id="extraSaveBtn" style="flex:1;font-size:12px;padding:10px;">Gem ekstra træning</button>
-          <button class="btn btn-outline" id="extraCancelBtn" style="font-size:12px;padding:10px;">Afbryd</button>
+          <button class="btn" id="extraSaveBtn" style="flex:1;font-size:12px;padding:10px;">${t("save_extra")}</button>
+          <button class="btn btn-outline" id="extraCancelBtn" style="font-size:12px;padding:10px;">${t("cancel")}</button>
         </div>
       </div>`;
       let extraScreenshot=null;
@@ -1750,9 +2124,9 @@ function renderTabPlan(plan,c){
         const isDone=kmDone>=kmTotal&&kmTotal>0;
         const isWkOpen=openWeekIdx===wIdx;
         gridHtml+=`<div class="phase-week-card${isCurrent?' current':''}${isDone?' done':''}${isWkOpen?' active':''}" data-weekidx="${wIdx}">
-          <div class="pwc-num">#${String(wIdx+1).padStart(2,'0')} UGE ${wIdx+1}</div>
+          <div class="pwc-num">#${String(wIdx+1).padStart(2,'0')} ${t("week_abbr")} ${wIdx+1}</div>
           <div class="pwc-date">${wDateStr}</div>
-          <div class="pwc-bottom"><span>${w.items.length} sess.</span><span>${kmDone}/${kmTotal} km</span></div>
+          <div class="pwc-bottom"><span>${w.items.length} ${t("sess_abbr")}</span><span>${fmtKm(kmDone)}/${fmtKm(kmTotal)} km</span></div>
         </div>`;
       });
       gridHtml+='</div>';
@@ -1762,7 +2136,7 @@ function renderTabPlan(plan,c){
         const openW=plan.weeks[openWeekIdx];
         sessHtml='<div class="phase-sessions">';
         openW.items.forEach((item,i)=>{
-          const[label,km,note]=item;
+          const[label,km,note,kind]=item;
           const ikey=keyFor(openWeekIdx,i);
           const p=plan.progress[ikey]||{done:false,actualKm:null};
           const sd=getSessionDate(plan,openWeekIdx,i);
@@ -1773,20 +2147,20 @@ function renderTabPlan(plan,c){
               <div class="checkbox${p.done?' checked':''}" data-cb="${ikey}" data-weekidx="${openWeekIdx}" data-i="${i}" data-km="${km}"></div>
               <div class="ps-info">
                 ${dateStr?`<div class="item-date">${dateStr}</div>`:''}
-                <div class="ps-label${p.done?' checked':''}">${label} · ${km} km</div>
+                <div class="ps-label${p.done?' checked':''}">${label} · ${fmtKm(km)} km</div>
               </div>
               <div class="ps-chevron">${isExp?'−':'+'}</div>
             </div>
             <div class="item-detail${isExp?' open':''}">
               ${note?`<div class="item-note" style="margin-bottom:8px;">${note}</div>`:''}
-              <div class="item-meta"><span class="meta-label">Pace</span>${sport.tempoFn(label,km,note)}</div>
-              <div class="item-meta"><span class="meta-label">Ernæring</span>${sport.nutritionFn(km)}</div>
+              <div class="item-meta"><span class="meta-label">${t("pace")}</span>${sport.tempoFn(label,km,note,kind)}</div>
+              <div class="item-meta"><span class="meta-label">${t("nutrition")}</span>${sport.nutritionFn(km)}</div>
               <div class="item-km" style="margin-top:12px;">
                 <input type="number" inputmode="numeric" value="${p.actualKm!=null?p.actualKm:km}" data-inp="${ikey}" data-km="${km}"/>
-                <span class="planned">/ ${km} km planlagt</span>
+                <span class="planned">${t("planned",{km:fmtKm(km)})}</span>
               </div>
               ${p.source?`<div class="item-source">↑ ${p.source}</div>`:''}
-              ${!p.done?`<button class="btn" style="margin-top:12px;font-size:12px;padding:10px 18px;" data-logbtn="${ikey}" data-weekidx="${openWeekIdx}" data-i="${i}" data-km="${km}">Marker gennemført · ${km} km</button>`:''}
+              ${!p.done?`<button class="btn" style="margin-top:12px;font-size:12px;padding:10px 18px;" data-logbtn="${ikey}" data-weekidx="${openWeekIdx}" data-i="${i}" data-km="${km}">${t("mark_done",{km:fmtKm(km)})}</button>`:''}
             </div>
           </div>`;
         });
@@ -1798,7 +2172,7 @@ function renderTabPlan(plan,c){
       <div class="phase-head${isPhaseOpen?' open':''}" data-phase="${phase.name}">
         <div class="phase-head-inner">
           <div class="phase-name">${phase.name}</div>
-          <div class="phase-meta">Uge ${startWk}${startWk!==endWk?'–'+endWk:''} · ${wCount} ${wCount===1?'uge':'uger'} · ${totalKm} km</div>
+          <div class="phase-meta">${t("phase_meta",{range:startWk+(startWk!==endWk?"–"+endWk:""),n:wCount,unit:wCount===1?t("unit_week"):t("unit_weeks"),km:fmtKm(totalKm)})}</div>
         </div>
         <div class="phase-arrow">${isPhaseOpen?'▴':'▾'}</div>
       </div>
@@ -1809,30 +2183,30 @@ function renderTabPlan(plan,c){
   // Plan summary card
   const stats=computeStats(plan);
   const totalPlanKm=plan.weeks.reduce((acc,w)=>acc+w.items.reduce((a,item)=>a+item[1],0),0);
-  const sportLabel=plan.sport?plan.sport.charAt(0).toUpperCase()+plan.sport.slice(1):'Sport';
+  const sportLabel=SPORTS[plan.sport]?SPORTS[plan.sport].label:"";
   const weeksLeft=plan.weeks.length-(stats.activeWeek-1);
 
   c.innerHTML=`<div class="plan-summary-card">
     <div class="psum-goal">${plan.label||'Din plan'}</div>
-    <div class="psum-meta">${sportLabel} · ${totalPlanKm} km total · ${plan.weeks.length} uger · ${weeksLeft} uger tilbage</div>
+    <div class="psum-meta">${t("psum_meta",{sport:sportLabel,km:fmtKm(totalPlanKm),n:plan.weeks.length,left:weeksLeft})}</div>
     <details class="psum-faq">
-      <summary class="psum-faq-toggle">Hvad betyder faserne?</summary>
+      <summary class="psum-faq-toggle">${t("phases_title")}</summary>
       <div class="psum-faq-body">
-        <div class="psum-faq-row"><span class="psum-faq-name">BASE</span><span class="psum-faq-desc">Opbygger det aerobe fundament — lav intensitet, høj volumen.</span></div>
-        <div class="psum-faq-row"><span class="psum-faq-name">BUILD</span><span class="psum-faq-desc">Intervaller og tempo-ture forbereder kroppen til race-pace.</span></div>
-        <div class="psum-faq-row"><span class="psum-faq-name">PEAK</span><span class="psum-faq-desc">Maksimal belastning. Du er nu på dit allerstærkeste.</span></div>
-        <div class="psum-faq-row"><span class="psum-faq-name">TAPER</span><span class="psum-faq-desc">Reduceret volumen — kroppen hviler og lader op til løbet.</span></div>
-        <div class="psum-faq-row"><span class="psum-faq-name">RACE WEEK</span><span class="psum-faq-desc">Friske ben og fokus. Det er dit løb nu.</span></div>
+        <div class="psum-faq-row"><span class="psum-faq-name">${t("api_BASE")}</span><span class="psum-faq-desc">${t("ph_base_d")}</span></div>
+        <div class="psum-faq-row"><span class="psum-faq-name">${t("api_BUILD")}</span><span class="psum-faq-desc">${t("ph_build_d")}</span></div>
+        <div class="psum-faq-row"><span class="psum-faq-name">${t("api_PEAK")}</span><span class="psum-faq-desc">${t("ph_peak_d")}</span></div>
+        <div class="psum-faq-row"><span class="psum-faq-name">${t("api_TAPER")}</span><span class="psum-faq-desc">${t("ph_taper_d")}</span></div>
+        <div class="psum-faq-row"><span class="psum-faq-name">${t("api_RACE WEEK")}</span><span class="psum-faq-desc">${t("ph_race_d")}</span></div>
       </div>
     </details>
   </div>
   <div class="import-box">
-    <h3>Importér fra screenshot</h3>
-    <p class="import-desc">Upload et screenshot fra Strava, Garmin, Polar eller lignende — vi finder dine aktiviteter automatisk.</p>
+    <h3>${t("import_title")}</h3>
+    <p class="import-desc">${t("import_body")}</p>
     <div id="importArea"><div class="upload-area" id="uploadDropzone">
-      <label class="upload-label" for="screenshotInput">Vælg billede</label>
+      <label class="upload-label" for="screenshotInput">${t("choose_image")}</label>
       <input type="file" id="screenshotInput" accept="image/*" style="display:none;">
-      <div class="upload-hint">PNG, JPG eller WebP · Strava, Garmin, Polar og mere</div>
+      <div class="upload-hint">${t("import_formats")}</div>
     </div></div>
   </div>
   <div class="phases-wrap">${phasesHtml}</div>`;
@@ -1881,7 +2255,7 @@ function renderTabPlan(plan,c){
       const cur=plan.progress[ikey]||{done:false,actualKm:null};
       cur.actualKm=e.target.value;plan.progress[ikey]=cur;await savePlan(plan);
       const lb=c.querySelector(`[data-logbtn="${ikey}"]`);
-      if(lb)lb.textContent='Marker gennemført · '+e.target.value+' km';
+      if(lb)lb.textContent=t("mark_done",{km:fmtKm(e.target.value)});
     };
   });
   // Log buttons
@@ -1908,7 +2282,7 @@ function renderTabTal(plan,c){
     const planEnd=new Date(plan.startDate);planEnd.setDate(planEnd.getDate()+plan.weeksAvailable*7);
     const now=new Date();now.setHours(0,0,0,0);
     const diff=Math.ceil((planEnd-now)/(7*24*60*60*1000));
-    weeksToEvent=diff>0?diff:(diff<=0?"Færdig":diff);
+    weeksToEvent=diff>0?diff:(diff<=0?t("finished"):diff);
   }
   // Bar chart: km done per week
   const weekKms=plan.weeks.map((w,wIdx)=>w.items.reduce((acc,item,i)=>{const p=plan.progress[keyFor(wIdx,i)];if(p&&p.done)return acc+((p.actualKm!=null&&p.actualKm!=="")?Number(p.actualKm):item[1]);return acc;},0));
@@ -1931,26 +2305,26 @@ function renderTabTal(plan,c){
   });
   const phaseBars=Object.entries(phases).map(([name,d])=>{
     const pct=d.total>0?Math.round((d.done/d.total)*100):0;
-    return`<div class="phase-bar-item"><div class="phase-bar-header"><span>${name}</span><span>${d.done}/${d.total} km · ${pct}%</span></div><div class="phase-bar-track"><div class="phase-bar-fill" style="width:${pct}%"></div></div></div>`;
+    return`<div class="phase-bar-item"><div class="phase-bar-header"><span>${name}</span><span>${fmtKm(d.done)}/${fmtKm(d.total)} km · ${pct}%</span></div><div class="phase-bar-track"><div class="phase-bar-fill" style="width:${pct}%"></div></div></div>`;
   }).join("");
 
   c.innerHTML=`<div class="tal-grid">
-    <div class="tal-stat"><div class="tal-num">${s.doneKm}</div><div class="tal-lbl">Km kørt</div></div>
-    <div class="tal-stat"><div class="tal-num">${s.doneSessions}</div><div class="tal-lbl">Træninger</div></div>
-    <div class="tal-stat"><div class="tal-num">${longestKm}</div><div class="tal-lbl">Længste tur</div></div>
-    <div class="tal-stat"><div class="tal-num">${weeksToEvent}</div><div class="tal-lbl">Uger til turen</div></div>
+    <div class="tal-stat"><div class="tal-num">${fmtKm(s.doneKm)}</div><div class="tal-lbl">${t("stat_km")}</div></div>
+    <div class="tal-stat"><div class="tal-num">${s.doneSessions}</div><div class="tal-lbl">${t("stat_sessions")}</div></div>
+    <div class="tal-stat"><div class="tal-num">${fmtKm(longestKm)}</div><div class="tal-lbl">${t("stat_longest")}</div></div>
+    <div class="tal-stat"><div class="tal-num">${weeksToEvent}</div><div class="tal-lbl">${t("stat_weeks_left")}</div></div>
   </div>
   <div class="chart-section">
-    <div class="chart-label">Km pr. uge</div>
+    <div class="chart-label">${t("stat_km_week")}</div>
     <svg width="100%" viewBox="0 0 ${cW} ${cH}" preserveAspectRatio="none" style="display:block;">${bars}</svg>
   </div>
   <div class="phase-bars">
-    <div class="chart-label" style="margin-bottom:16px;">Fase-fremdrift</div>
+    <div class="chart-label" style="margin-bottom:16px;">${t("stat_phase_progress")}</div>
     ${phaseBars}
   </div>
   <div class="tab-danger">
-    <button class="btn-danger" id="resetBtn">Nulstil fremdrift</button>
-    <button class="btn-danger" id="deleteBtn" style="margin-top:8px;">Slet plan</button>
+    <button class="btn-danger" id="resetBtn">${t("reset_progress")}</button>
+    <button class="btn-danger" id="deleteBtn" style="margin-top:8px;">${t("delete_plan")}</button>
   </div>
   <div style="height:32px;"></div>`;
 
@@ -1958,8 +2332,8 @@ function renderTabTal(plan,c){
   document.getElementById("resetBtn").onclick=async()=>{
     if(resetArmed){plan.progress={};await savePlan(plan);resetArmed=false;renderTabTal(plan,c);return;}
     resetArmed=true;const b=document.getElementById("resetBtn");
-    b.textContent="⚠ Sikker? Tryk igen";b.style.borderColor="var(--red)";b.style.color="var(--red)";
-    setTimeout(()=>{resetArmed=false;const rb=document.getElementById("resetBtn");if(rb){rb.textContent="Nulstil fremdrift";rb.style.borderColor="";rb.style.color="";}},3000);
+    b.textContent=t("sure_again");b.style.borderColor="var(--red)";b.style.color="var(--red)";
+    setTimeout(()=>{resetArmed=false;const rb=document.getElementById("resetBtn");if(rb){rb.textContent=t("reset_progress");rb.style.borderColor="";rb.style.color="";}},3000);
   };
   let deleteArmed=false;
   document.getElementById("deleteBtn").onclick=async()=>{
@@ -1969,15 +2343,15 @@ function renderTabTal(plan,c){
       delete state.planCache[id];state.activePlan=null;openWeekIdx=null;planTab="today";state.view="library";render();return;
     }
     deleteArmed=true;const b=document.getElementById("deleteBtn");
-    b.textContent="⚠ Sikker? Tryk igen for at slette";b.style.borderColor="var(--red)";b.style.color="var(--red)";
-    setTimeout(()=>{deleteArmed=false;const db=document.getElementById("deleteBtn");if(db){db.textContent="Slet plan";db.style.borderColor="";db.style.color="";}},3000);
+    b.textContent=t("sure_delete");b.style.borderColor="var(--red)";b.style.color="var(--red)";
+    setTimeout(()=>{deleteArmed=false;const db=document.getElementById("deleteBtn");if(db){db.textContent=t("delete_plan");db.style.borderColor="";db.style.color="";}},3000);
   };
 }
 
 /* ---------------- SCREENSHOT IMPORT ---------------- */
 async function handleScreenshot(file){
   const area=document.getElementById("importArea");
-  area.innerHTML=`<div class="import-status">Analysing image…</div>`;
+  area.innerHTML=`<div class="import-status">${t("analysing")}</div>`;
   const reader=new FileReader();
   reader.readAsDataURL(file);
   reader.onerror=()=>{area.innerHTML=resetUploadHtml("Could not read the file. Please try again.");wireUploadArea();};
@@ -1996,9 +2370,9 @@ async function handleScreenshot(file){
       state.activePlan.weeks.forEach((w,wIdx)=>{w.items.forEach((item,i)=>{const p=state.activePlan.progress[keyFor(wIdx,i)];if(!p||!p.done)openSlots.push({wIdx,i,label:"Week "+(wIdx+1)+" · "+item[0]});});});
       let rowsHtml=activities.map((act,idx)=>{
         const opts=openSlots.map(s=>`<option value="${s.wIdx}_${s.i}">${s.label}</option>`).join("");
-        return `<div class="activity-row"><span>${act.date} · ${act.name} · ${act.km} km</span><select id="assign_${idx}">${opts}</select><button class="btn-outline" style="padding:6px 12px;font-size:11px;" data-idx="${idx}">Log it</button></div>`;
+        return `<div class="activity-row"><span>${act.date} · ${act.name} · ${fmtKm(act.km)} km</span><select id="assign_${idx}">${opts}</select><button class="btn-outline" style="padding:6px 12px;font-size:11px;" data-idx="${idx}">${t("log_it")}</button></div>`;
       }).join("");
-      area.innerHTML=`<div class="import-status" style="margin-bottom:8px;">Match your activities to sessions:</div>`+rowsHtml;
+      area.innerHTML=`<div class="import-status" style="margin-bottom:8px;">${t("match_activities")}</div>`+rowsHtml;
       area.querySelectorAll("button[data-idx]").forEach(btn=>{
         btn.onclick=async()=>{
           const idx=btn.dataset.idx;const act=activities[idx];
@@ -2015,9 +2389,9 @@ async function handleScreenshot(file){
 function resetUploadHtml(err){
   return`${err?`<div class="import-status" style="color:var(--red);margin-bottom:10px;">${err}</div>`:""}
     <div class="upload-area" id="uploadDropzone">
-      <label class="upload-label" for="screenshotInput">Vælg billede</label>
+      <label class="upload-label" for="screenshotInput">${t("choose_image")}</label>
       <input type="file" id="screenshotInput" accept="image/*" style="display:none;">
-      <div class="upload-hint">PNG, JPG eller WebP · Strava, Garmin, Polar og mere</div>
+      <div class="upload-hint">${t("import_formats")}</div>
     </div>`;
 }
 function wireUploadArea(){
@@ -2038,6 +2412,11 @@ function render(){
   else if(state.view==="plan")renderPlanView();
 }
 (async function init(){
+  document.getElementById("langToggle").querySelectorAll("button").forEach(b=>{
+    b.onclick=()=>setLang(b.dataset.lang);
+  });
+  syncLangToggle();
+  document.documentElement.lang=lang;
   renderLibrary(true);
   state.planIndex=await loadIndex();
   if(state.view==="library")renderLibrary(false);
