@@ -483,6 +483,27 @@ body{
 .sport-choice button.active{background:var(--yellow);}
 .wizard-actions{padding:28px 0 0;}
 
+/* ── GENERATE LOADING SCREEN ── */
+.generate-loading{
+  min-height:70vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 24px;text-align:center;
+}
+.generate-spinner{
+  width:40px;height:40px;
+  border:3px solid #e8e8e8;
+  border-top-color:var(--text);
+  border-radius:50%;
+  animation:generate-spin 0.8s linear infinite;
+  margin-bottom:24px;
+}
+@keyframes generate-spin{to{transform:rotate(360deg);}}
+.generate-loading-title{
+  font-family:'Turret Road',sans-serif;font-size:16px;font-weight:800;
+  letter-spacing:0.04em;color:var(--text);margin-bottom:8px;
+}
+.generate-loading-sub{font-size:13px;color:var(--subtle);min-height:18px;}
+
 /* ── ROUTE TIMELINE ── */
 .route-wrap{padding:0 24px;}
 .route-label{
@@ -1357,6 +1378,31 @@ function renderWizard(){
     const longest=parseFloat(document.getElementById("wLongest").value)||0;
     const startDate=document.getElementById("wStartDate").value||new Date().toISOString().slice(0,10);
     if(!target||!weeksAvail){alertInline("generateBtn","Enter a target distance and number of weeks.");return;}
+
+    const loadingMessages=[
+      "Analyserer din træningshistorik…",
+      "Beregner faseopdeling…",
+      "Bygger ugentlig struktur…",
+      "Skriver coach-noter…",
+      "Sidste finpudsning…",
+    ];
+    app.innerHTML=`
+      <div class="generate-loading">
+        <div class="generate-spinner"></div>
+        <div class="generate-loading-title">Din AI-coach tænker…</div>
+        <div class="generate-loading-sub" id="genLoadingSub">${loadingMessages[0]}</div>
+      </div>
+    `;
+    let msgIdx=0;
+    const subEl=document.getElementById("genLoadingSub");
+    const msgInterval=setInterval(()=>{
+      msgIdx=(msgIdx+1)%loadingMessages.length;
+      if(subEl)subEl.textContent=loadingMessages[msgIdx];
+    },9000);
+
+    await new Promise(resolve=>setTimeout(resolve,45000));
+    clearInterval(msgInterval);
+
     const weeks=generatePlan(state.wizardSport,target,weeksAvail,sessions,longest,minSession);
     const id="p"+Date.now();
     const plan={id,sport:state.wizardSport,label:target+" km "+SPORTS[state.wizardSport].label.toLowerCase(),target,weeksAvailable:weeksAvail,sessionsPerWeek:sessions,startDate,createdAt:new Date().toISOString().slice(0,10),weeks,progress:{}};
