@@ -1400,7 +1400,7 @@ function renderWizard(){
       if(subEl)subEl.textContent=loadingMessages[msgIdx];
     },2000);
 
-    await new Promise(resolve=>setTimeout(resolve,10000));
+    await new Promise(resolve=>setTimeout(resolve,8000));
     clearInterval(msgInterval);
 
     const weeks=generatePlan(state.wizardSport,target,weeksAvail,sessions,longest,minSession);
