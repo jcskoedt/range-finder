@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Range Finder — Merged variant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Turret+Road:wght@500;700;800&family=Inter:wght@100;200;300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --yellow: #F5E642;
+    --text:   #0A0A0A;
+    --bg:     #FFFFFF;
+    --border: #0A0A0A;
+    --subtle: #666666;
+    --muted:  #999999;
+    --red:    #CC2020;
+  }
+
+  html, body {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell {
+    max-width: 1200px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+
+  /* ─── HERO (video full-bleed) ─────────────────── */
+  .hero {
+    position: relative;
+    padding: 32px 28px 40px;
+    border-bottom: 2px solid var(--border);
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--text);
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+  }
+  @media (min-width: 1025px) {
+    .hero { padding-left: max(28px, calc((100vw - 1200px) / 2 + 28px)); padding-right: max(28px, calc((100vw - 1200px) / 2 + 28px)); }
+  }
+  .hero-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -2;
+  }
+  /* Cinematic 21:9 letterbox only once there's enough width for it —
+     below this, the video just fills the hero edge-to-edge, no bars. */
+  @media (min-width: 1025px) {
+    .hero-video {
+      top: 50%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      transform: translateY(-50%);
+    }
+  }
+  .hero-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0.6) 100%);
+    z-index: -1;
+  }
+
+  /* Wordmark row — bled to the hero's outer edge, kept small and discreet */
+  .wordmark {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: -32px -28px 40px -28px;
+    padding: 16px 20px;
+  }
+  .wordmark-icon {
+    width: 22px;
+    height: 22px;
+    background: var(--text);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .wordmark-icon svg {
+    width: 13px;
+    height: 13px;
+    fill: none;
+    stroke: var(--yellow);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .wordmark-text {
+    font-family: 'Turret Road', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--yellow);
+    line-height: 1;
+  }
+
+  /* Eyebrow */
+  .eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 200;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--yellow);
+    opacity: 0.9;
+    margin-bottom: 12px;
+  }
+
+  /* Headline */
+  .headline {
+    font-family: 'Turret Road', sans-serif;
+    font-weight: 800;
+    font-size: clamp(38px, 10vw, 52px);
+    line-height: 1.0;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+    color: var(--yellow);
+    margin-bottom: 18px;
+  }
+
+  /* Subhead */
+  .subhead {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 200;
+    line-height: 1.6;
+    color: var(--yellow);
+    opacity: 0.85;
+    max-width: 340px;
+    margin-bottom: 32px;
+  }
+
+  /* CTA row */
+  .cta-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 24px;
+    background: var(--text);
+    color: var(--yellow);
+    font-family: 'Turret Road', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .btn-primary:hover {
+    background: var(--yellow);
+    color: var(--text);
+  }
+  .btn-primary svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .cta-note {
+    font-size: 11px;
+    color: var(--yellow);
+    opacity: 0.85;
+    font-family: 'Inter', sans-serif;
+    font-weight: 200;
+    letter-spacing: 0.04em;
+  }
+
+  /* ─── PROOF STRIP ─────────────────────────────── */
+  .proof-strip {
+    padding: 14px 28px;
+    border-bottom: 1px solid #E8E8E8;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .proof-avatars {
+    display: flex;
+  }
+  .proof-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+    background: #CCC;
+    margin-left: -5px;
+    flex-shrink: 0;
+  }
+  .proof-avatar:first-child { margin-left: 0; background: #B8B8B8; }
+  .proof-avatar:nth-child(2) { background: #A0A0A0; }
+  .proof-avatar:nth-child(3) { background: #C8C8C8; }
+  .proof-text {
+    font-size: 11px;
+    color: var(--subtle);
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+    font-weight: 200;
+  }
+  .proof-text strong {
+    color: var(--text);
+    font-weight: 300;
+  }
+
+  /* ─── LIBRARY ─────────────────────────────────── */
+  .library-section {
+    padding: 24px 28px;
+    flex: 1;
+  }
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+    font-family: 'Turret Road', sans-serif;
+  }
+
+  /* Ghost card */
+  .ghost-card {
+    border: 1.5px dashed #E0E0E0;
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    opacity: 0.5;
+  }
+  .ghost-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: #E8E8E8;
+    flex-shrink: 0;
+  }
+  .ghost-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ghost-line {
+    height: 9px;
+    border-radius: 3px;
+    background: #E8E8E8;
+  }
+  .ghost-line.short { width: 50%; }
+  .ghost-line.med   { width: 72%; }
+
+  .empty-message {
+    text-align: center;
+    padding: 28px 20px 20px;
+  }
+  .empty-heading {
+    font-family: 'Turret Road', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    opacity: 0.35;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .empty-sub {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ─── HOW IT WORKS ────────────────────────────── */
+  .how-section {
+    padding: 24px 28px 36px;
+    border-top: 1px solid #E8E8E8;
+  }
+  .how-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'Turret Road', sans-serif;
+    margin-bottom: 20px;
+  }
+  .how-item {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+  .how-item:last-child { margin-bottom: 0; }
+  .how-num {
+    font-family: 'Turret Road', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--yellow);
+    background: var(--text);
+    width: 22px;
+    height: 22px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: 0;
+    margin-top: 1px;
+  }
+  .how-text {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--subtle);
+    font-weight: 200;
+  }
+  .how-text strong {
+    display: block;
+    font-weight: 300;
+    color: var(--text);
+    margin-bottom: 2px;
+    font-size: 13px;
+  }
+
+  /* ─── TICKER ──────────────────────────────────── */
+  .ticker-wrap {
+    background: var(--text);
+    overflow: hidden;
+    width: 100%;
+    border-top: 2px solid var(--border);
+    padding: 9px 0;
+    white-space: nowrap;
+  }
+  .ticker-track {
+    display: inline-flex;
+    animation: ticker 70s linear infinite;
+    will-change: transform;
+  }
+  .ticker-track:hover { animation-play-state: paused; }
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    font-family: 'Turret Road', sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--yellow);
+  }
+  .ticker-sep {
+    color: var(--yellow);
+    opacity: 0.4;
+    margin: 0 20px;
+    font-size: 10px;
+  }
+  @keyframes ticker {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ─── HERO ─────────────────────────────────── -->
+  <section class="hero">
+
+    <video class="hero-video" id="heroVideo" autoplay muted loop playsinline>
+      <source src="hero-video.mp4" type="video/mp4">
+    </video>
+    <div class="hero-scrim"></div>
+
+    <div class="wordmark">
+      <div class="wordmark-icon">
+        <svg viewBox="0 0 16 16">
+          <polyline points="2,11 5,7 8,9 11,5 14,7"/>
+        </svg>
+      </div>
+      <span class="wordmark-text">Range Finder</span>
+    </div>
+
+    <p class="eyebrow">AI-coached training plans</p>
+
+    <h1 class="headline">
+      Your season,<br>structured.
+    </h1>
+
+    <p class="subhead">
+      Upload a screenshot of your recent activities and get a personalised 4-week training plan — no coach, no complex software.
+    </p>
+
+    <div class="cta-row">
+      <a href="#" class="btn-primary">
+        Build my plan
+        <svg viewBox="0 0 14 14">
+          <line x1="3" y1="7" x2="11" y2="7"/>
+          <polyline points="7,3 11,7 7,11"/>
+        </svg>
+      </a>
+      <span class="cta-note">Free to start</span>
+    </div>
+
+  </section>
+
+  <!-- ─── PROOF STRIP ───────────────────────────── -->
+  <div class="proof-strip">
+    <div class="proof-avatars">
+      <div class="proof-avatar"></div>
+      <div class="proof-avatar"></div>
+      <div class="proof-avatar"></div>
+    </div>
+    <p class="proof-text"><strong>For cyclists, runners &amp; triathletes</strong> training 5–10 hrs/week without a coach</p>
+  </div>
+
+  <!-- ─── LIBRARY ────────────────────────────────── -->
+  <div class="library-section">
+    <p class="section-label">My plans</p>
+
+    <div class="ghost-card">
+      <div class="ghost-icon"></div>
+      <div class="ghost-lines">
+        <div class="ghost-line med"></div>
+        <div class="ghost-line short"></div>
+      </div>
+    </div>
+
+    <div class="empty-message">
+      <p class="empty-heading">No plans yet</p>
+      <p class="empty-sub">Upload a screenshot of your recent activities<br>to generate your first training plan.</p>
+    </div>
+  </div>
+
+  <!-- ─── HOW IT WORKS ──────────────────────────── -->
+  <div class="how-section">
+    <p class="how-label">How it works</p>
+
+    <div class="how-item">
+      <span class="how-num">1</span>
+      <p class="how-text"><strong>Upload a screenshot</strong>Your Strava, Garmin, or Apple Fitness feed — 2–4 weeks of history is enough.</p>
+    </div>
+    <div class="how-item">
+      <span class="how-num">2</span>
+      <p class="how-text"><strong>Get a 4-week plan</strong>Structured sessions: easy runs, threshold work, long rides. Calibrated to what you've been doing.</p>
+    </div>
+    <div class="how-item">
+      <span class="how-num">3</span>
+      <p class="how-text"><strong>Check off each session</strong>Your plan lives in the app. Tick sessions as you go. Regenerate when life happens.</p>
+    </div>
+  </div>
+
+  <!-- ─── TICKER ───────────────────────────────── -->
+  <div class="ticker-wrap"><div class="ticker-track" id="tickerTrack"></div></div>
+
+</div>
+
+<script>
+  (function () {
+    var quotes = [
+      "Consistency beats perfection",
+      "Every session counts",
+      "Rest is part of the plan",
+      "Train to the line",
+      "Miles make champions",
+      "Show up. Do the work. Repeat",
+      "You don't find the finish line — you earn it",
+      "One more week. One more session",
+      "Fatigue is temporary. Fitness is permanent",
+      "The best plan is the one you follow"
+    ];
+    var content = quotes.map(function (q) {
+      return '<span class="ticker-item">' + q + '<span class="ticker-sep">✦</span></span>';
+    }).join("");
+    document.getElementById("tickerTrack").innerHTML = content + content;
+  })();
+
+</script>
+</body>
+</html>
