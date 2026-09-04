@@ -5,13 +5,15 @@
     { "src": "logo.png", "use": "@vercel/static" },
     { "src": "landing-hero-mockup.html", "use": "@vercel/static" },
     { "src": "hero-video.mp4", "use": "@vercel/static" },
+    { "src": "hero-fallback.jpg", "use": "@vercel/static" },
     { "src": "api/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/api/(.*)", "dest": "/api/$1.js" },
     { "src": "/logo.png", "dest": "/logo.png" },
     { "src": "/landing-hero-mockup.html", "dest": "/landing-hero-mockup.html" },
     { "src": "/hero-video.mp4", "dest": "/hero-video.mp4" },
+    { "src": "/hero-fallback.jpg", "dest": "/hero-fallback.jpg" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
