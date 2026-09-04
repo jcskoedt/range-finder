@@ -86,11 +86,35 @@ body{
 
 /* ── HERO ── */
 .hero{
-  background:var(--yellow);
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+  background:var(--text);
   padding:32px max(28px, calc((100vw - 640px) / 2 + 28px)) 40px;
   border-bottom:2px solid var(--border);
   margin-left:calc(50% - 50vw);
   width:100vw;
+}
+.hero-video{
+  position:absolute;
+  top:0;left:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  z-index:-2;
+}
+.hero-scrim{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0.6) 100%);
+  z-index:-1;
+}
+@media (min-width:1025px){
+  .hero-video{
+    top:50%;
+    height:auto;
+    aspect-ratio:16/9;
+    transform:translateY(-50%);
+  }
 }
 .hero-wordmark{
   display:flex;
@@ -117,7 +141,7 @@ body{
   letter-spacing:0.06em;
   text-transform:uppercase;
   line-height:44px;
-  color:var(--text);
+  color:var(--yellow);
 }
 .hero-eyebrow{
   font-size:10px;
@@ -125,8 +149,8 @@ body{
   text-transform:uppercase;
   font-weight:200;
   font-family:'Inter',sans-serif;
-  color:var(--text);
-  opacity:0.5;
+  color:var(--yellow);
+  opacity:0.9;
   margin-bottom:12px;
 }
 .hero h1{
@@ -136,14 +160,14 @@ body{
   line-height:1.0;
   letter-spacing:-0.03em;
   text-transform:uppercase;
-  -webkit-text-stroke:1px var(--text);
+  color:var(--yellow);
 }
 .hero-sub{
   margin-top:18px;
   font-size:14px;
   max-width:340px;
-  color:var(--text);
-  opacity:0.65;
+  color:var(--yellow);
+  opacity:0.85;
   line-height:1.6;
   font-weight:200;
 }
@@ -156,8 +180,8 @@ body{
 }
 .hero-cta-note{
   font-size:11px;
-  color:var(--text);
-  opacity:0.5;
+  color:var(--yellow);
+  opacity:0.8;
   font-weight:200;
   letter-spacing:0.04em;
 }
@@ -998,6 +1022,10 @@ function renderLibrary(loading){
   let heroHtml=`
     <div class="ticker-wrap"><div class="ticker-track">${tickerContent}${tickerContent}</div></div>
     <div class="hero">
+      <video class="hero-video" autoplay muted loop playsinline>
+        <source src="hero-video.mp4" type="video/mp4">
+      </video>
+      <div class="hero-scrim"></div>
       <div class="hero-wordmark">
         <div class="hero-wordmark-icon">
           <svg viewBox="0 0 16 16"><polyline points="2,11 5,7 8,9 11,5 14,7"/></svg>
