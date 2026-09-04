@@ -1728,7 +1728,7 @@ async function handleScreenshot(file){
           const sel=document.getElementById("assign_"+idx).value;
           const[wIdx,i]=sel.split("_").map(Number);
           state.activePlan.progress[keyFor(wIdx,i)]={done:true,actualKm:act.km,source:act.name+" ("+act.date+")"};
-          await savePlan(state.activePlan);renderRoute();renderStats();renderWeeksList();
+          await savePlan(state.activePlan);render();
           btn.closest(".activity-row").style.opacity="0.4";btn.textContent="Logged";btn.disabled=true;
         };
       });
