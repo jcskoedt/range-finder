@@ -7,9 +7,6 @@
     { "src": "hero-video.mp4", "use": "@vercel/static" },
     { "src": "api/*.js", "use": "@vercel/node" }
   ],
-  "functions": {
-    "api/generate.js": { "maxDuration": 90 }
-  },
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/logo.png", "dest": "/logo.png" },

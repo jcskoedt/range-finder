@@ -7,9 +7,13 @@ const MAX_TOKENS = 4096;
 // Measured real latency (2026-09-04): 12 weeks/4 sessions ~14-16s, 24 weeks/6
 // sessions ~35s. Vercel Functions default to a 300s limit with Fluid Compute
 // (all plans, including Hobby) — NOT the old 10s Hobby limit. 40s per attempt
-// leaves real margin over the worst measured case; see vercel.json's
-// maxDuration for the matching function-level budget (covers this timeout
-// twice over, for the one retry below).
+// leaves real margin over the worst measured case, comfortably within the
+// platform default even with the one retry below.
+// NOTE: vercel.json cannot set an explicit maxDuration here — its legacy
+// `builds`-based config (needed for the static file routing) is mutually
+// exclusive with the `functions` property Vercel uses for that. This relies
+// on the platform default (300s) rather than a pinned per-function value;
+// revisit if this project ever migrates off the `builds` config.
 const CLAUDE_TIMEOUT_MS = 40000;
 
 // Best-effort in-memory rate limiting (resets per cold start), same pattern as api/scan.js
