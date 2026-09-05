@@ -116,7 +116,6 @@ Appen var halvt engelsk (landingsside, wizard) og halvt dansk (planvisning, coac
 - [x] **UI: "Vil du justere din plan?"** — DONE 2026-09-05. `skippedWeekInfo()` finder uger hvis sidste sessionsdato er passeret uden at noget er krydset af. Gult banner øverst på planen med "Juster planen" / "Nej tak". Sprungne uger bliver liggende som historik, så progress-nøgler og datoer ikke forskydes; kun de resterende ugers sessioner skrives om.
 
   **Spørger ikke igen** efter et svar — hverken ja eller nej — medmindre *flere* uger springes over bagefter. Fejler kaldet, siger banneret eksplicit at planen er uændret, og knappen bliver klar igen.
-- [ ] UI: "Vil du justere din plan?" prompt når en uge er passeret uden loggede sessioner
 
 ---
 
