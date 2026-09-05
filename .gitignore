@@ -6,9 +6,5 @@ node_modules/
 .gstack/
 screenshots/
 
-# Design assets for another project — the .site file is 130MB, over GitHub's limit
-FIG/
-Ugebogen.dc.html
-
 # macOS
 .DS_Store
