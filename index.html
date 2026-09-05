@@ -654,6 +654,7 @@ body{
 .item-label.checked{color:var(--subtle);text-decoration:line-through;}
 #app{padding-bottom:72px;}
 .share-row{padding:0 24px 20px;}
+.share-buttons{display:flex;gap:8px;flex-wrap:wrap;}
 .share-row .btn{font-size:12px;padding:10px 18px;}
 .share-hint{font-size:11px;color:var(--subtle);margin-top:8px;line-height:1.45;}
 .share-url{
@@ -1075,7 +1076,10 @@ en:{
   notice_ratelimit:"You've made a lot of plans in a short time. This one uses our own algorithm.",
   notice_too_large:"A plan that long is better handled by our own algorithm than by the AI coach — so that is what this one is.",
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
-  share_plan:"Share this plan", share_copied:"Link copied — paste it wherever you like.",
+  share_plan:"Share this plan", export_ical:"Add to calendar (.ics)",
+  export_ical_done_one:"1 session downloaded — open the file to add it to your calendar.",
+  export_ical_done_many:"{n} sessions downloaded — open the file to add them to your calendar.",
+  export_ical_none:"This plan has no dates to export.", share_copied:"Link copied — paste it wherever you like.",
   share_too_long:"This plan is too long to share as a link.",
   share_copy_manually:"Copy the link from here:",
   shared_title:"A plan was shared with you", shared_import:"Import it", shared_dismiss:"No thanks",
@@ -1225,7 +1229,10 @@ da:{
   notice_ratelimit:"Du har lavet mange planer på kort tid. Denne er lavet med vores egen algoritme.",
   notice_too_large:"Så lang en plan laver vores egen algoritme bedre end AI-coachen — så det er den, du får her.",
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
-  share_plan:"Del denne plan", share_copied:"Link kopieret — sæt det ind hvor du vil.",
+  share_plan:"Del denne plan", export_ical:"Læg i kalender (.ics)",
+  export_ical_done_one:"1 træning hentet — åbn filen for at lægge den i din kalender.",
+  export_ical_done_many:"{n} træninger hentet — åbn filen for at lægge dem i din kalender.",
+  export_ical_none:"Denne plan har ingen datoer at eksportere.", share_copied:"Link kopieret — sæt det ind hvor du vil.",
   share_too_long:"Denne plan er for lang til at deles som link.",
   share_copy_manually:"Kopiér linket herfra:",
   shared_title:"En plan er delt med dig", shared_import:"Importér den", shared_dismiss:"Nej tak",
@@ -1581,6 +1588,91 @@ async function runReplan(plan,sw){
     render();
     return false;
   }
+}
+
+/* ---------------- EXPORT TO A CALENDAR (.ics) ---------------- */
+// Sessions have a date but no time, so these are all-day events: no timezone to
+// get wrong, and they sit at the top of the day where a training plan belongs.
+// RFC 5545 is fussy — CRLF endings, escaped separators, and lines folded at 75
+// octets — and calendar apps reject a file that gets any of it wrong.
+function icsEscape(text){
+  return String(text==null?"":text)
+    .replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,")
+    .replace(/\r?\n/g,"\\n");
+}
+function icsFold(line){
+  // Fold on octets, not characters: æ and ø are two bytes each, and folding by
+  // character length would let a line past the limit.
+  const bytes=new TextEncoder().encode(line);
+  if(bytes.length<=75)return line;
+  const out=[];let cur="";let curBytes=0;
+  for(const ch of line){
+    const n=new TextEncoder().encode(ch).length;
+    if(curBytes+n>(out.length?74:75)){out.push(cur);cur=" ";curBytes=1;}
+    cur+=ch;curBytes+=n;
+  }
+  out.push(cur);
+  return out.join("\r\n");
+}
+function icsDate(d){
+  return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
+}
+
+function planToIcs(plan){
+  const sport=SPORTS[plan.sport];
+  const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+  const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Range Finder//Training Plan//EN",
+    "CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:"+icsEscape(plan.label)];
+  let count=0;
+
+  const push=(uid,date,summary,desc)=>{
+    const end=new Date(date);end.setDate(end.getDate()+1);
+    lines.push("BEGIN:VEVENT","UID:"+uid,"DTSTAMP:"+stamp,
+      "DTSTART;VALUE=DATE:"+icsDate(date),"DTEND;VALUE=DATE:"+icsDate(end),
+      icsFold("SUMMARY:"+icsEscape(summary)),
+      icsFold("DESCRIPTION:"+icsEscape(desc)),"END:VEVENT");
+    count++;
+  };
+
+  plan.weeks.forEach((w,wIdx)=>{
+    w.items.forEach((item,i)=>{
+      const sd=getSessionDate(plan,wIdx,i);
+      if(!sd)return;
+      const[label,km,note,kind]=item;
+      const fuel=sport.fuelFn(km);
+      const desc=[
+        note||"",
+        t("pace")+": "+sport.tempoFn(label,km,note,kind),
+        t("nutrition")+": "+fuel.during,
+        fuel.before?t("fuel_before_label")+": "+fuel.before:"",
+        w.phase,
+      ].filter(Boolean).join("\n");
+      push("rf-"+plan.id+"-"+wIdx+"-"+i+"@rangefinderapp.vercel.app",
+        new Date(sd),label+" · "+fmtKm(km)+" km",desc);
+    });
+  });
+
+  (plan.extras||[]).forEach((ex,ei)=>{
+    if(!ex.date)return;
+    push("rf-"+plan.id+"-extra-"+ei+"@rangefinderapp.vercel.app",
+      new Date(ex.date),ex.label+" · "+fmtKm(ex.km)+" km",t("extra"));
+  });
+
+  lines.push("END:VCALENDAR");
+  return count?lines.join("\r\n")+"\r\n":null;
+}
+
+function downloadIcs(plan){
+  const ics=planToIcs(plan);
+  if(!ics)return 0;
+  const name=(plan.label||"plan").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+  const blob=new Blob([ics],{type:"text/calendar;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download="range-finder-"+(name||"plan")+".ics";
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  return (ics.match(/BEGIN:VEVENT/g)||[]).length;
 }
 
 /* ---------------- SHARE A PLAN AS A URL ---------------- */
@@ -2690,7 +2782,10 @@ function renderTabPlan(plan,c){
   </div>
   <div class="phases-wrap">${phasesHtml}</div>
   <div class="share-row">
-    <button class="btn btn-outline" id="sharePlanBtn">${t("share_plan")}</button>
+    <div class="share-buttons">
+      <button class="btn btn-outline" id="sharePlanBtn">${t("share_plan")}</button>
+      <button class="btn btn-outline" id="icsBtn">${t("export_ical")}</button>
+    </div>
     <div class="share-hint" id="shareHint"></div>
   </div>
 `;
@@ -2700,6 +2795,13 @@ function renderTabPlan(plan,c){
   // was quietly failing and always dropping to the manual field.
   shareUrl=undefined;
   buildShareUrl(plan).then(u=>{shareUrl=u;}).catch(()=>{shareUrl=null;});
+
+  const icsBtn=document.getElementById("icsBtn");
+  if(icsBtn)icsBtn.onclick=()=>{
+    const hint=document.getElementById("shareHint");
+    const n=downloadIcs(plan);
+    hint.textContent=!n?t("export_ical_none"):n===1?t("export_ical_done_one"):t("export_ical_done_many",{n:n});
+  };
 
   const shareBtn=document.getElementById("sharePlanBtn");
   if(shareBtn)shareBtn.onclick=async()=>{

@@ -148,7 +148,13 @@ Appen var halvt engelsk (landingsside, wizard) og halvt dansk (planvisning, coac
   URL-parameteren ryddes efter import eller afvisning, så en genindlæsning ikke tilbyder det samme igen. Clipboard-fejl falder tilbage til at vise linket i et markerbart felt med en label — det er den vej der reelt bliver testet, da headless-browseren blokerer clipboard.
 
   **Ikke testet:** længdegrænsen på 8000 tegn er kun ramt af syntetiske planer, som gzip komprimerer urealistisk godt. En rigtig 24-ugers plan bør måles.
-- [ ] **iCal-eksport** — .ics-fil download fra PLAN-tabben
+- [x] **iCal-eksport** — DONE 2026-09-05. "Læg i kalender (.ics)" ved siden af del-knappen nederst i PLAN-fanen. Hver session bliver en heldagsbegivenhed med navn og km i titlen, og coach-note, tempo, ernæring, før-træning og fase i beskrivelsen. Ekstra træninger kommer med.
+
+  **Heldagsbegivenheder, ikke tidspunkter.** Sessioner har en dato men intet klokkeslæt, så alt andet ville være opdigtet — og heldagsbegivenheder har ingen tidszone at tage fejl af.
+
+  **RFC 5545 er kræven,** og kalenderprogrammer afviser en fil der rammer forkert. Verificeret på en rigtig 12-ugers plan (49 events): kun CRLF, ingen linje over 75 **oktetter** (foldningen tæller bytes, ikke tegn — æ og ø fylder to), balancerede BEGIN/END, `DTEND` altid præcis én dag efter `DTSTART`, og `;` `,` og linjeskift escapet korrekt.
+
+  Ental/flertal på kvitteringen ("1 træning" mod "3 træninger") blev fanget i test.
 - [ ] **Ugentlig coaching-email** — Resend + Supabase Edge Function cron
 - [ ] **Strava-integration** — kræver OAuth-review-proces, uger ventetid
 - [ ] **Haiku → Sonnet upgrade** — Kun hvis plan-kvalitet viser sig utilstrækkelig
