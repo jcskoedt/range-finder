@@ -172,9 +172,25 @@ Appen var halvt engelsk (landingsside, wizard) og halvt dansk (planvisning, coac
 - [ ] **(prompt-validering 2026-09-04)** Fase-tabellens regel for uge 17+ ("tilføj 1 BASE uge, maks 8 BASE uger totalt") er tvetydig for uger 21-24 — tabellen siger intet om hvad der sker når BASE-loftet er nået men planen stadig skal være længere. Nuværende implementering (`allocatePhases()` i CEO-planen) fortsætter bare med at forlænge BASE forbi loftet i stedet for at gætte på noget andet. Bør genbesøges med rigtig coaching-faglig input før B1 skibes.
 
   **Kan ikke løses uden en træner.** Kandidatregel: forlæng BUILD i stedet for BASE når BASE rammer loftet på 8. Det er et gæt, ikke fagligt funderet — og præcis den slags hvor et forkert gæt ser rigtigt ud. Spørg en rigtig coach før det implementeres.
-- [ ] **(design-review 2026-09-04, FINDING-002)** Appen har kun ét reelt `<h1>` og ingen `<h2>`-`<h6>` nogen steder — sektionstitler ("My plans", "150 km cycling", fasenavne, "How it works") er alle styled `<div>`/`<p>`, ikke semantiske headings. Skader skærmlæser-navigation (ingen heading-outline at hoppe igennem). Ikke en CSS-only fix — kræver ændringer i hver `render*`-funktion. Fortjener en dedikeret gennemgang, ikke bundlet ind i en design-polish-omgang.
+- [x] **FINDING-002: overskriftssemantik** — DONE 2026-09-05. Appen havde ét `<h1>` og nul `<h2>`-`<h6>`; alle sektionstitler var styled `<div>`/`<p>`/`<span>`. Nu er der en rigtig disposition i hver visning, uden spring i niveauer:
 
-  **Løsning:** en fokuseret omgang gennem hver `render*`-funktion der giver sektionstitler rigtige `<h2>`-`<h4>`. Skal ikke smugles ind i en anden opgave — det rører hele UI-laget.
+  ```
+  Landing   h1 Din sæson, struktureret
+              h2 Mine planer
+              h2 Sådan virker det
+                h3 Upload et screenshot / Få en 4-ugers plan / Kryds hver træning af
+  Plan      h1 200 km cykling
+              h2 Faser og begreber
+                h3 Faser / Begreber
+              h2 Base / Build / Peak / Taper
+  ```
+
+  **Udseendet er uændret.** `*{margin:0}` fandtes i forvejen, og klasserne sætter selv font-family/size/weight — men for en sikkerheds skyld er der tilføjet `h1,h2,h3,h4,h5,h6{font:inherit}`, så et tag-skift aldrig kan trække browserens standardtypografi med ind. Verificeret med computed styles på alle konverterede elementer.
+
+  **Mere end overskrifter:** sessionslisten er nu en rigtig `<ul>`/`<li>` (en skærmlæser siger "liste med 4"), og fanerne har fået `role="tablist"`/`role="tab"` med `aria-selected` plus et `role="tabpanel"`.
+
+  **Ikke gjort:** de fire nøgletal på TAL-fanen er stadig `<div>`-par frem for en `<dl>`. De læses forståeligt op som "0 Km kørt", så det er en forbedring, ikke en mangel.
+
 
 ---
 

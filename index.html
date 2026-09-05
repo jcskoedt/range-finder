@@ -20,6 +20,8 @@
   --border:#0A0A0A;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
+h1,h2,h3,h4,h5,h6{font:inherit;}
+ul.phase-sessions{list-style:none;}
 html{overflow-x:hidden;}
 html,body{background:var(--bg);color:var(--text);}
 body{
@@ -243,7 +245,7 @@ body{
   flex-shrink:0;margin-top:1px;
 }
 .how-text{font-size:13px;line-height:1.55;color:var(--subtle);font-weight:200;}
-.how-text strong{display:block;font-weight:300;color:var(--text);margin-bottom:2px;}
+.how-text h3{display:block;font-weight:300;color:var(--text);margin-bottom:2px;}
 /* ── GHOST CARD ── */
 .ghost-card{
   border:1.5px dashed #E0E0E0;border-radius:6px;
@@ -319,7 +321,7 @@ body{
   padding:28px 0 16px;
   border-bottom:2px solid var(--border);
 }
-.plans-header span{
+.plans-header h2{
   font-size:11px;
   letter-spacing:0.14em;
   text-transform:uppercase;
@@ -554,7 +556,7 @@ body{
   border-bottom:2px solid var(--border);
   padding:20px 24px;
 }
-.import-box h3{
+.import-box h2{
   font-family:'Turret Road', sans-serif;
   font-size:15px;
   font-weight:700;
@@ -1938,7 +1940,7 @@ function renderLibrary(loading){
     plansHtml=`
       <div class="plans-section">
         <div class="plans-header">
-          <span>${t("my_plans")}</span>
+          <h2>${t("my_plans")}</h2>
         </div>
         <div style="padding:16px 0 0;">
           <div class="ghost-card">
@@ -1971,7 +1973,7 @@ function renderLibrary(loading){
     plansHtml=`
       <div class="plans-section">
         <div class="plans-header" id="plansAnchor">
-          <span>${t("my_plans")}</span>
+          <h2>${t("my_plans")}</h2>
           <button class="btn-outline" id="newPlanBtn2">${t("new_plan")}</button>
         </div>
         ${cards}
@@ -1981,19 +1983,19 @@ function renderLibrary(loading){
 
   const howHtml=loading?"":`
     <details class="how-dropdown" ${idx.length===0?"open":""}>
-      <summary class="how-toggle">${t("how_it_works")}</summary>
+      <summary class="how-toggle"><h2>${t("how_it_works")}</h2></summary>
       <div class="how-body">
         <div class="how-item">
           <span class="how-num">1</span>
-          <p class="how-text"><strong>${t("hiw_1_t")}</strong>${t("hiw_1_b")}</p>
+          <div class="how-text"><h3>${t("hiw_1_t")}</h3>${t("hiw_1_b")}</div>
         </div>
         <div class="how-item">
           <span class="how-num">2</span>
-          <p class="how-text"><strong>${t("hiw_2_t")}</strong>${t("hiw_2_b")}</p>
+          <div class="how-text"><h3>${t("hiw_2_t")}</h3>${t("hiw_2_b")}</div>
         </div>
         <div class="how-item">
           <span class="how-num">3</span>
-          <p class="how-text"><strong>${t("hiw_3_t")}</strong>${t("hiw_3_b")}</p>
+          <div class="how-text"><h3>${t("hiw_3_t")}</h3>${t("hiw_3_b")}</div>
         </div>
       </div>
     </details>
@@ -2084,7 +2086,7 @@ function renderWizard(){
     <div class="wizard-body">
 
       <div style="padding-top:24px;margin-bottom:4px;">
-        <p class="wizard-section-label">${t("your_sport")}</p>
+        <h2 class="wizard-section-label">${t("your_sport")}</h2>
         <div class="sport-cards" id="sportChoice">
           <div class="sport-card ${state.wizardSport==="cykling"?"active":""}" data-sport="cykling">
             <span class="sport-card-icon">${sportIcons.cykling}</span>
@@ -2354,12 +2356,12 @@ function renderPlanView(){
     </div>
     ${planNotice?`<div class="plan-notice" id="planNotice"><div>${planNotice}</div><button class="plan-notice-close" id="planNoticeClose" aria-label="${t("close")}">✕</button></div>`:""}
     ${replanHtml}
-    <div class="plan-tabs">
-      <button class="plan-tab ${planTab==="today"?"active":""}" data-tab="today">${t("tab_today")}</button>
-      <button class="plan-tab ${planTab==="plan"?"active":""}" data-tab="plan">${t("tab_plan")}</button>
-      <button class="plan-tab ${planTab==="tal"?"active":""}" data-tab="tal">${t("tab_stats")}</button>
+    <div class="plan-tabs" role="tablist">
+      <button class="plan-tab ${planTab==="today"?"active":""}" role="tab" aria-selected="${planTab==="today"}" aria-controls="tabContent" data-tab="today">${t("tab_today")}</button>
+      <button class="plan-tab ${planTab==="plan"?"active":""}" role="tab" aria-selected="${planTab==="plan"}" aria-controls="tabContent" data-tab="plan">${t("tab_plan")}</button>
+      <button class="plan-tab ${planTab==="tal"?"active":""}" role="tab" aria-selected="${planTab==="tal"}" aria-controls="tabContent" data-tab="tal">${t("tab_stats")}</button>
     </div>
-    <div id="tabContent"></div>
+    <div id="tabContent" role="tabpanel" tabindex="0"></div>
   `;
 
   // Shown for this render only — any later full render drops it.
@@ -2436,7 +2438,7 @@ function renderTabToday(plan,c){
     if(prog.done){
       cardHtml=`<div class="today-card done">
         <span class="today-phase-tag">${ts.w.phase}</span>
-        <div class="today-card-name">${label}</div>
+        <h2 class="today-card-name">${label}</h2>
         <div class="today-card-km" style="color:rgba(255,255,255,0.6);">${t("completed")}</div>
         <div style="margin-top:12px;display:flex;gap:10px;align-items:center;">
           <input id="todayActKm" type="number" inputmode="numeric" value="${prog.actualKm!=null?prog.actualKm:km}" style="width:60px;font-family:'Turret Road',sans-serif;font-size:14px;font-weight:700;border:none;border-bottom:2px solid rgba(255,255,255,0.4);background:transparent;color:#fff;padding:2px 0;">
@@ -2451,7 +2453,7 @@ function renderTabToday(plan,c){
     } else {
       cardHtml=`<div class="today-card">
         <span class="today-phase-tag">${ts.w.phase}</span>
-        <div class="today-card-name">${label}</div>
+        <h2 class="today-card-name">${label}</h2>
         <div class="today-card-km">${fmtKm(km)} km</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn" id="todayLogBtn" style="font-size:12px;padding:10px 20px;">${t("log_session")}</button>
@@ -2465,7 +2467,7 @@ function renderTabToday(plan,c){
     const inRange=planStart&&selDate>=planStart&&selDate<planEnd;
     const isSelToday=selDate.getTime()===today2.getTime();
     cardHtml=`<div class="today-card">
-      <div class="today-card-name">${inRange?t("rest_day"):t("no_session")}</div>
+      <h2 class="today-card-name">${inRange?t("rest_day"):t("no_session")}</h2>
       <div class="today-card-km" style="color:var(--subtle);">${inRange?(isSelToday?t("rest_is_part"):t("free_day")):t("plan_not_started")}</div>
     </div>`;
   }
@@ -2490,7 +2492,7 @@ function renderTabToday(plan,c){
     const[label,km]=ns.item;
     const dateStr=`${dayNames[(ns.date.getDay()+6)%7]} ${ns.date.getDate()}`;
     nextHtml=`<div class="next-session-card">
-      <div class="next-session-label">${t("next_session")}</div>
+      <h2 class="next-session-label">${t("next_session")}</h2>
       <div class="next-session-name">${label}</div>
       <div class="next-session-meta">${dateStr} · ${fmtKm(km)} km · ${ns.w.phase}</div>
     </div>`;
@@ -2550,7 +2552,7 @@ function renderTabToday(plan,c){
   }
   c.innerHTML=`${cardHtml}${extrasForSelHtml?`<div style="margin-top:0;">${extrasForSelHtml}</div>`:""}${guideHtml}${nextHtml}${ringHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 24px 0;"><button id="stripPrevBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">‹</button><span style="font-family:'Turret Road',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);">${weekLabel}</span><button id="stripNextBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">›</button></div><div class="week-strip" style="margin-top:8px;">${stripHtml}</div><div class="add-extra-wrap"><button class="btn btn-outline" id="addExtraBtn" style="width:100%;font-size:12px;padding:10px;">${t("add_extra")}</button><div id="addExtraForm" style="display:none;margin-top:12px;"></div></div>
   <div class="import-box">
-    <h3>${t("import_title")}</h3>
+    <h2>${t("import_title")}</h2>
     <p class="import-desc">${t("import_body")}</p>
     <div id="importArea"><div class="upload-area" id="uploadDropzone">
       <label class="upload-label" for="screenshotInput">${t("choose_image")}</label>
@@ -2708,7 +2710,7 @@ function renderTabPlan(plan,c){
       let sessHtml='';
       if(openWeekIdx!==null&&allWkIdx.includes(openWeekIdx)){
         const openW=plan.weeks[openWeekIdx];
-        sessHtml='<div class="phase-sessions">';
+        sessHtml='<ul class="phase-sessions">';
         openW.items.forEach((item,i)=>{
           const[label,km,note,kind]=item;
           const ikey=keyFor(openWeekIdx,i);
@@ -2717,7 +2719,7 @@ function renderTabPlan(plan,c){
           const dateStr=sd?fmtDate(sd):'';
           const isExp=openItemKey===ikey;
           const fuel=sport.fuelFn(km);
-          sessHtml+=`<div class="ps-item${p.done?' done':''}">
+          sessHtml+=`<li class="ps-item${p.done?' done':''}">
             <div class="ps-row" data-expand="${ikey}" style="cursor:pointer;">
               <div class="checkbox${p.done?' checked':''}" data-cb="${ikey}" data-weekidx="${openWeekIdx}" data-i="${i}" data-km="${km}"></div>
               <div class="ps-info">
@@ -2739,16 +2741,16 @@ function renderTabPlan(plan,c){
               ${p.source?`<div class="item-source">↑ ${p.source}</div>`:''}
               ${!p.done?`<button class="btn" style="margin-top:12px;font-size:12px;padding:10px 18px;" data-logbtn="${ikey}" data-weekidx="${openWeekIdx}" data-i="${i}" data-km="${km}">${t("mark_done",{km:fmtKm(km)})}</button>`:''}
             </div>
-          </div>`;
+          </li>`;
         });
-        sessHtml+='</div>';
+        sessHtml+='</ul>';
       }
       bodyHtml=`${gridHtml}${sessHtml}`;
     }
     phasesHtml+=`<div class="phase-block">
       <div class="phase-head${isPhaseOpen?' open':''}" data-phase="${phase.name}">
         <div class="phase-head-inner">
-          <div class="phase-name">${phase.name}</div>
+          <h2 class="phase-name">${phase.name}</h2>
           <div class="phase-meta">${t("phase_meta",{range:startWk+(startWk!==endWk?"–"+endWk:""),n:wCount,unit:wCount===1?t("unit_week"):t("unit_weeks"),km:fmtKm(totalKm)})}</div>
         </div>
         <div class="phase-arrow">${isPhaseOpen?'▴':'▾'}</div>
@@ -2767,15 +2769,15 @@ function renderTabPlan(plan,c){
     <div class="psum-goal">${plan.label||'Din plan'}</div>
     <div class="psum-meta">${t("psum_meta",{sport:sportLabel,km:fmtKm(totalPlanKm),n:plan.weeks.length,left:weeksLeft})}</div>
     <details class="psum-faq">
-      <summary class="psum-faq-toggle">${t("phases_title")}</summary>
+      <summary class="psum-faq-toggle"><h2>${t("phases_title")}</h2></summary>
       <div class="psum-faq-body">
-        <div class="psum-faq-head" style="margin-top:0;">${t("phases_head")}</div>
+        <h3 class="psum-faq-head" style="margin-top:0;">${t("phases_head")}</h3>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_BASE")}</span><span class="psum-faq-desc">${t("ph_base_d")}</span></div>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_BUILD")}</span><span class="psum-faq-desc">${t("ph_build_d")}</span></div>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_PEAK")}</span><span class="psum-faq-desc">${t("ph_peak_d")}</span></div>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_TAPER")}</span><span class="psum-faq-desc">${t("ph_taper_d")}</span></div>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_RACE WEEK")}</span><span class="psum-faq-desc">${t("ph_race_d")}</span></div>
-        <div class="psum-faq-head">${t("terms_head")}</div>
+        <h3 class="psum-faq-head">${t("terms_head")}</h3>
         ${["rpe","zone2","sweetspot","threshold","gel","carbload"].map(k=>`<div class="psum-faq-row"><span class="psum-faq-name">${t("term_"+k+"_n")}</span><span class="psum-faq-desc">${t("term_"+k+"_d")}</span></div>`).join("")}
       </div>
     </details>
@@ -2920,11 +2922,11 @@ function renderTabTal(plan,c){
     <div class="tal-stat"><div class="tal-num">${weeksToEvent}</div><div class="tal-lbl">${t("stat_weeks_left")}</div></div>
   </div>
   <div class="chart-section">
-    <div class="chart-label">${t("stat_km_week")}</div>
+    <h2 class="chart-label">${t("stat_km_week")}</h2>
     <svg width="100%" viewBox="0 0 ${cW} ${cH}" preserveAspectRatio="none" style="display:block;">${bars}</svg>
   </div>
   <div class="phase-bars">
-    <div class="chart-label" style="margin-bottom:16px;">${t("stat_phase_progress")}</div>
+    <h2 class="chart-label" style="margin-bottom:16px;">${t("stat_phase_progress")}</h2>
     ${phaseBars}
   </div>
   <div class="tab-danger">
