@@ -653,6 +653,16 @@ body{
 .item-label{font-size:14px;font-weight:600;}
 .item-label.checked{color:var(--subtle);text-decoration:line-through;}
 #app{padding-bottom:72px;}
+.storage-warning{
+  position:fixed;left:12px;right:12px;bottom:64px;z-index:60;
+  display:flex;gap:12px;align-items:flex-start;
+  padding:12px 14px;border:2px solid var(--border);background:var(--red);
+  color:#fff;font-size:12px;line-height:1.45;
+}
+.storage-warning button{
+  background:none;border:none;color:#fff;cursor:pointer;
+  font-size:14px;line-height:1;padding:0;flex-shrink:0;
+}
 .lang-toggle{
   position:fixed;bottom:16px;right:16px;z-index:50;
   display:flex;border:2px solid var(--border);background:var(--bg);
@@ -982,7 +992,12 @@ if (!window.storage) {
     get: (key) => Promise.resolve(
       localStorage.getItem(key) !== null ? { value: localStorage.getItem(key) } : null
     ),
-    set: (key, value) => Promise.resolve(localStorage.setItem(key, value)),
+    set: (key, value) => {
+      // localStorage.setItem throws synchronously when the quota is exceeded,
+      // which escaped the callers' promise handling entirely.
+      try { localStorage.setItem(key, value); return Promise.resolve(); }
+      catch (e) { return Promise.reject(e); }
+    },
     delete: (key) => Promise.resolve(localStorage.removeItem(key)),
   };
 }
@@ -1037,6 +1052,7 @@ en:{
   notice_ratelimit:"You've made a lot of plans in a short time. This one uses our own algorithm.",
   notice_too_large:"A plan that long is better handled by our own algorithm than by the AI coach — so that is what this one is.",
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
+  storage_failed:"Could not save — this device's storage is full. Free up space, or your changes will be lost when you reload.",
   close:"Close",
   // plan view
   back_plans:"← Plans", tab_today:"Today", tab_plan:"Plan", tab_stats:"Stats",
@@ -1175,6 +1191,7 @@ da:{
   notice_ratelimit:"Du har lavet mange planer på kort tid. Denne er lavet med vores egen algoritme.",
   notice_too_large:"Så lang en plan laver vores egen algoritme bedre end AI-coachen — så det er den, du får her.",
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
+  storage_failed:"Kunne ikke gemme — enhedens lager er fuldt. Frigør plads, ellers går dine ændringer tabt når du genindlæser.",
   close:"Luk",
   back_plans:"← Planer", tab_today:"I dag", tab_plan:"Plan", tab_stats:"Tal",
   rest_day:"Hviledag", no_session:"Ingen session", rest_is_part:"Restitution er en del af planen.",
@@ -1519,9 +1536,30 @@ const INDEX_KEY="plans-index";
 const STORAGE_TIMEOUT_MS=6000;
 function withTimeout(promise,ms,fallback){return Promise.race([promise,new Promise(r=>setTimeout(()=>r(fallback),ms))]);}
 async function loadIndex(){try{const r=await withTimeout(window.storage.get(INDEX_KEY,false),STORAGE_TIMEOUT_MS,null);return r&&r.value?JSON.parse(r.value):[]}catch(e){return[];}}
-async function saveIndex(idx){try{await withTimeout(window.storage.set(INDEX_KEY,JSON.stringify(idx),false),STORAGE_TIMEOUT_MS,null);}catch(e){}}
+async function saveIndex(idx){
+  try{await withTimeout(window.storage.set(INDEX_KEY,JSON.stringify(idx),false),STORAGE_TIMEOUT_MS,null);return true;}
+  catch(e){storageWarning(e);return false;}
+}
 async function loadPlan(id){try{const r=await withTimeout(window.storage.get("plan-"+id,false),STORAGE_TIMEOUT_MS,null);return r&&r.value?JSON.parse(r.value):null;}catch(e){return null;}}
-async function savePlan(plan){try{await withTimeout(window.storage.set("plan-"+plan.id,JSON.stringify(plan),false),STORAGE_TIMEOUT_MS,null);}catch(e){}}
+async function savePlan(plan){
+  try{await withTimeout(window.storage.set("plan-"+plan.id,JSON.stringify(plan),false),STORAGE_TIMEOUT_MS,null);return true;}
+  catch(e){storageWarning(e);return false;}
+}
+
+// A failed save means the session the user just logged disappears on reload,
+// so it cannot be silent. Deliberately outside the render cycle: savePlan is
+// called from a dozen places and a re-render would wipe an in-app banner.
+let storageWarningShown=false;
+function storageWarning(err){
+  console.warn("[storage] save failed:",err);
+  if(storageWarningShown)return;
+  storageWarningShown=true;
+  const el=document.createElement("div");
+  el.className="storage-warning";
+  el.innerHTML=`<div>${t("storage_failed")}</div><button aria-label="${t("close")}">✕</button>`;
+  el.querySelector("button").onclick=()=>{el.remove();storageWarningShown=false;};
+  document.body.appendChild(el);
+}
 
 /* ---------------- DATE HELPERS ---------------- */
 function sessionDayOffsets(n){
