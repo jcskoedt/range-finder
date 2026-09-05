@@ -803,6 +803,18 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
   margin-top:3px;line-height:1.45;
 }
 .ps-item.done .ps-note{opacity:0.5;}
+.week-ring-card{
+  display:flex;align-items:center;gap:16px;
+  margin:20px 24px 0;padding:14px 16px;border:2px solid var(--border);
+}
+.week-ring{width:64px;height:64px;flex-shrink:0;}
+.week-ring-text{line-height:1.3;}
+.week-ring-pct{font-family:'Turret Road',sans-serif;font-size:22px;font-weight:700;}
+.week-ring-km{font-size:12px;margin-top:2px;}
+.week-ring-lbl{
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--subtle);margin-top:4px;
+}
 .ps-fuel{font-size:11px;color:var(--subtle);margin-top:4px;line-height:1.45;}
 .ps-fuel-label{
   text-transform:uppercase;font-size:9px;font-weight:700;letter-spacing:0.08em;
@@ -1030,7 +1042,7 @@ en:{
   pace:"Pace", nutrition:"Nutrition", note:"Note", next_session:"Next session",
   extra:"Extra", add_extra:"+ Add extra session", confirm:"Confirm",
   upload_screenshot_opt:"Upload screenshot (optional)", save_extra:"Save extra session", cancel:"Cancel",
-  this_week:"This week", next_week:"Next week",
+  this_week:"This week", next_week:"Next week", week_progress:"Week progress",
   mark_done:"Mark complete · {km} km", planned:"/ {km} km planned",
   ph_name:"Name (e.g. Run)", ph_km:"Km",
   phases_title:"Phases and terms",
@@ -1164,7 +1176,7 @@ da:{
   pace:"Tempo", nutrition:"Ernæring", note:"Note", next_session:"Næste træning",
   extra:"Ekstra", add_extra:"+ Tilføj ekstra træning", confirm:"Bekræft",
   upload_screenshot_opt:"Upload screenshot (valgfrit)", save_extra:"Gem ekstra træning", cancel:"Afbryd",
-  this_week:"Denne uge", next_week:"Næste uge",
+  this_week:"Denne uge", next_week:"Næste uge", week_progress:"Ugens fremdrift",
   mark_done:"Marker gennemført · {km} km", planned:"/ {km} km planlagt",
   ph_name:"Navn (fx Løbetur)", ph_km:"Km",
   phases_title:"Faser og begreber",
@@ -1847,6 +1859,30 @@ function isWeekPartial(plan,wIdx){return plan.weeks[wIdx].items.some((_,i)=>plan
 // sums like 628.5999999999999 reach the UI. Round at display only — the stored
 // values and the km inputs stay exact.
 function fmtKm(n){return Math.round(Number(n)*10)/10;}
+// Km logged vs planned for one calendar week — the same week the strip below
+// the ring is showing, so the two always agree. Reads plan.progress rather
+// than keeping a separate tally (eng-review finding). Completed extras count
+// toward logged, which is why the arc has to be capped: doing more than
+// planned is a good thing, not a rendering bug.
+function weekProgress(plan,wkStart){
+  const end=new Date(wkStart);end.setDate(wkStart.getDate()+7);
+  let planned=0,logged=0;
+  plan.weeks.forEach((w,wIdx)=>w.items.forEach((item,i)=>{
+    const sd=getSessionDate(plan,wIdx,i);
+    if(!sd)return;
+    const d=new Date(sd);d.setHours(0,0,0,0);
+    if(d<wkStart||d>=end)return;
+    planned+=Number(item[1])||0;
+    const pr=plan.progress[keyFor(wIdx,i)];
+    if(pr&&pr.done)logged+=(pr.actualKm!=null&&pr.actualKm!=="")?Number(pr.actualKm):(Number(item[1])||0);
+  }));
+  (plan.extras||[]).forEach(ex=>{
+    const d=new Date(ex.date);d.setHours(0,0,0,0);
+    if(ex.done&&d>=wkStart&&d<end)logged+=Number(ex.km)||0;
+  });
+  return{planned,logged};
+}
+
 function computeStats(plan){
   let ds=0,ts=0,dk=0,tk=0;
   plan.weeks.forEach((w,wIdx)=>{w.items.forEach((item,i)=>{ts++;tk+=item[1];const p=plan.progress[keyFor(wIdx,i)];if(p&&p.done){ds++;dk+=(p.actualKm!=null&&p.actualKm!=="")?Number(p.actualKm):item[1];}});});
@@ -2038,7 +2074,27 @@ function renderTabToday(plan,c){
     stripHtml+=`<div class="strip-day${isT?" today":""}${isSel&&!hasS?" selected":""}${!isT?trainingCls:""}" data-ts="${day.getTime()}"><div class="strip-day-name">${dayNames[d]}</div><div class="strip-dot${isDone?" done":hasS?" has-session":""}"></div><div class="strip-day-num">${day.getDate()}</div></div>`;
   }
 
-  c.innerHTML=`${cardHtml}${extrasForSelHtml?`<div style="margin-top:0;">${extrasForSelHtml}</div>`:""}${guideHtml}${nextHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 24px 0;"><button id="stripPrevBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">‹</button><span style="font-family:'Turret Road',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);">${weekLabel}</span><button id="stripNextBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">›</button></div><div class="week-strip" style="margin-top:8px;">${stripHtml}</div><div class="add-extra-wrap"><button class="btn btn-outline" id="addExtraBtn" style="width:100%;font-size:12px;padding:10px;">${t("add_extra")}</button><div id="addExtraForm" style="display:none;margin-top:12px;"></div></div><div style="height:32px;"></div>`;
+  const wp=weekProgress(plan,wkStart);
+  let ringHtml="";
+  if(wp.planned>0||wp.logged>0){
+    const pct=wp.planned>0?wp.logged/wp.planned:1;
+    const shown=Math.min(1,pct); // arc caps at full; the number below does not
+    const r=30,C=2*Math.PI*r;
+    ringHtml=`<div class="week-ring-card">
+      <svg class="week-ring" viewBox="0 0 72 72" aria-hidden="true">
+        <circle cx="36" cy="36" r="${r}" fill="none" stroke="#e8e8e8" stroke-width="6"/>
+        <circle cx="36" cy="36" r="${r}" fill="none" stroke="var(--text)" stroke-width="6"
+          stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-shown)).toFixed(1)}"
+          stroke-linecap="butt" transform="rotate(-90 36 36)"/>
+      </svg>
+      <div class="week-ring-text">
+        <div class="week-ring-pct">${Math.round(pct*100)}%</div>
+        <div class="week-ring-km">${fmtKm(wp.logged)} / ${fmtKm(wp.planned)} km</div>
+        <div class="week-ring-lbl">${t("week_progress")}</div>
+      </div>
+    </div>`;
+  }
+  c.innerHTML=`${cardHtml}${extrasForSelHtml?`<div style="margin-top:0;">${extrasForSelHtml}</div>`:""}${guideHtml}${nextHtml}${ringHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 24px 0;"><button id="stripPrevBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">‹</button><span style="font-family:'Turret Road',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);">${weekLabel}</span><button id="stripNextBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">›</button></div><div class="week-strip" style="margin-top:8px;">${stripHtml}</div><div class="add-extra-wrap"><button class="btn btn-outline" id="addExtraBtn" style="width:100%;font-size:12px;padding:10px;">${t("add_extra")}</button><div id="addExtraForm" style="display:none;margin-top:12px;"></div></div><div style="height:32px;"></div>`;
 
   // Wire log button
   if(ts){

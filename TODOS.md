@@ -49,8 +49,8 @@ Tre brud fandtes ved kodelæsning; alle ville have fejlet støjende i det øjebl
 - [x] Plan-rendering: coach_note vises nu kursivt under sessionsnavnet i PLAN-fanen — DONE 2026-09-05. Den lå kun i den udfoldede detalje, så hele pointen med AI-planer krævede et klik pr. session. Fjernet fra detaljen så den ikke står to steder. Dæmpes til 50% når sessionen er krydset af. Algoritme-planers tekniske noter ("intervaller: 3x10 min sweet spot") vises samme sted; sessioner uden note får ingen linje.
 - [x] **Ernæring pr. session** — DONE 2026-09-05. Den gamle `nutritionFn` var abstrakt ("60-90 g kulhydrat i timen") og lå gemt i den udfoldede detalje. Erstattet af `fuelFor()` med konkrete bånd pr. sport: "1 flaske + en banan", "2 flasker + 2-3 barer", "planlæg et madstop". Hvert bånd har tre dele — `short` til plan-listen, `during` til detaljen, og `before` (kun på lange træninger) med hvad man skal spise **inden**. Deterministisk kode, ikke AI, så den virker også på algoritme-planer og koster hverken tokens eller ventetid.
 - [x] **Ordliste i "Faser og begreber"** — DONE 2026-09-05. Panelet forklarede kun faserne, men planen er fuld af fagsprog ingen havde defineret. Tilføjet RPE, Zone 2, sweet spot, tærskel, gel og carb-load. Titlen er ændret fra "Hvad betyder faserne?" da panelet nu dækker begge dele.
-- [ ] I DAG-tab: Progress Ring (SVG-cirkel, km logget / km planlagt for ugen)
-- [ ] I DAG-tab: km-loginput ("Km logget i dag") skriver til localStorage
+- [x] **I DAG-tab: Progress Ring** — DONE 2026-09-05. SVG-ring over ugenavigationen, så den summerer præcis den uge stripen viser. `weekProgress()` læser `plan.progress` og `plan.extras` — ingen ny localStorage-struktur (eng-review-fundet). Skjules når ugen hverken har planlagte eller loggede km.
+- [ ] **I DAG-tab: km-loginput** — muligvis forældet. Der findes allerede et redigerbart km-felt (`todayActKm`) i dagens kort plus "Log session"-knappen, og det samme i PLAN-fanens detalje. Hvis punktet mente en fritstående "jeg cyklede 40 km i dag" uden tilknytning til en planlagt session, er det en anden feature end den beskrevne. Afklar før der bygges et duplikat.
 - [x] Loading state under generering: knap disables + spinner + "Din AI-coach tænker..." — DONE 2026-09-04, 45 sek med roterende undertekst, se HANDOFF.md
 - [x] **Fallback-besked** — DONE 2026-09-05. Gult banner øverst på PLAN-viewet. Tre varianter: generel fallback, rate limit (429), og capped plan. Banneret gemmes bevidst ikke på planobjektet — det beskriver hvad der lige skete, ikke hvad planen er.
 - [ ] Email-felt (valgfrit, sidst i wizard): "Bruges kun til at gemme din plan, når du logger ind."
@@ -59,7 +59,7 @@ Tre brud fandtes ved kodelæsning; alle ville have fejlet støjende i det øjebl
 - [x] **Double-submit** — DONE 2026-09-04, knappen fjernes fra DOM'en under de 45 sek loading-skærm, umuligt at trykke igen
 - [x] **Model refusal** — DONE 2026-09-05. Alt der ikke er en gyldig plan (afvisning, parse-fejl, 4xx/5xx, netværksfejl, timeout) falder tilbage til `generatePlan()`.
 - [x] **Default uger** — DONE. `DEFAULT_WEEKS = 12` server-side, og frontenden sender nu altid `plan_weeks` fra wizardens "Time available".
-- [ ] **Progress Ring >100%** — Cap ring ved 100%; tillad km-log over planlagt
+- [x] **Progress Ring >100%** — DONE 2026-09-05. Buen cappes ved fuld cirkel, men tallet viser det rigtige: 300 km logget mod 60 planlagt står som 500%. Gennemførte ekstra-træninger tæller med i logget, hvilket er hele grunden til at cappen skal være der.
 
 ---
 
