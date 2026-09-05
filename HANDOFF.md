@@ -1,164 +1,166 @@
 # Range Finder — Handoff
-Sidst opdateret: 2026-09-05 (sprogskifter)
+Sidst opdateret: 2026-09-06
 
-## ✅ BLOKEREN ER VÆK — verificeret i produktion 2026-09-05
+## Hvad det er
 
-`ANTHROPIC_API_KEY` er en org-nøgle uden workspace-scope. Løst med Mulighed B: `ANTHROPIC_WORKSPACE_ID` sat i Vercel (Production), og `api/scan.js` fik samme header som `generate.js` (den manglede).
+En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, måldistance, niveau og enten et antal uger eller en løbsdato; Claude Haiku genererer en plan med faser, sessioner og coach-noter. Planen bor i browserens localStorage. Ingen konti, ingen server-database.
 
-**Første vellykkede ægte Anthropic-kald i projektets historie**, mod `https://rangefinderapp.vercel.app/api/generate`:
+**Single-file SPA** — hele frontenden er `index.html` (3034 linjer, inkl. CSS og JS). Tre Vercel-funktioner i `api/`.
 
-| Test | Resultat |
+---
+
+## Status: B1 og B2 er færdige og i produktion
+
+**Live:** https://rangefinderapp.vercel.app
+
+| | |
 |---|---|
-| Løb, 42 km, 4 uger, dansk | HTTP 200 på 6,9 sek. Faser BASE/BUILD/BUILD/TAPER matcher `allocatePhases(4)`. Længste tur 34 km = 80% af målet. Maraton 42 km i sidste uge. |
-| Cykling, 200 km, engelsk | Engelsk planindhold. Længste tur 160 km = præcis 80% af målet. 5 sessioner/uge for "Erfaren". |
-| Svømning, 5 km, Begynder | 3 sessioner/uge. Decimaler (0,75/1,25/2,5 km) — netop det tilfælde `fmtKm()` blev lavet til. |
+| AI-plangenerering | virker, dansk og engelsk |
+| Replan efter sprungne uger | virker |
+| Screenshot-import (Strava m.fl.) | virker |
+| Del plan som link | virker |
+| Kalender-eksport (.ics) | virker |
+| Sprogskifter DA/EN | hele appen, inkl. AI-output |
+| Valideringsgate | 16/16 |
 
-`sport: "lob"` accepteres og returneres som `"løb"`. Måldistancen styrer opbygningen. Latency er 7-10 sek, altså markant hurtigere end de 14-35 sek der blev målt lokalt.
-
-### Faldgruber ved deploy — læs før næste gang
-1. **Vercel læser ikke `.gitignore`.** Uden `.vercelignore` blev `FIG/` (149MB) uploadet og deployet fejlede med "File size limit exceeded (100 MB)". `.vercelignore` findes nu; upload er 33MB.
-2. **`vercel --prod` kan sige "Not authorized" OG alligevel deploye.** Det skete 2026-09-05: CLI'en fejlede med exit 1, men deploymentet lå `Ready` i produktion. **Tjek altid `vercel ls rangefinderapp` før du fejlsøger** — fejlen kommer fra et efterfølgende trin, ikke fra selve deployet.
-3. **Aliaset følger ikke nye deploys.** `rangefinderapp.vercel.app` pegede stadig på en 11 timer gammel deployment og svarede 500, mens den nye kode var live på `traeningsplan-app.vercel.app`. Efter hvert deploy:
-   ```bash
-   vercel ls rangefinderapp
-   vercel alias set <nyeste-url> rangefinderapp.vercel.app
-   ```
-   Bør automatiseres — det er tredje gang det bider.
-
-## Status i én sætning
-B1 er live og verificeret i produktion: wizarden kalder `/api/generate`, får rigtige AI-planer fra Claude Haiku på dansk eller engelsk, og falder tilbage til den lokale algoritme ved enhver fejl. Tilbage står prompt-validering af den ændrede prompt, samt B2 og C.
+Tilbage: **C** (konti + cloud sync) og en håndfuld mindre punkter — se `TODOS.md`.
 
 ---
 
-## Live app
-**URL:** `https://rangefinderapp.vercel.app`
-**Repo:** `jcskoedt/range-finder` (branch: `main`)
-**Arbejdsgang:** alt laves og committes lokalt først. Der pushes og deployes **kun** når Jacob eksplicit siger til — se CLAUDE.md. (Denne linje sagde tidligere "alt arbejde pushes direkte", hvilket var forkert.)
-**Vercel-projekt:** `rangefinderapp` (team: `range-finder`)
+## Kom i gang
 
-**Domænet er `rangefinderapp.vercel.app` — og kun det.** Fra 2026-09-05 er det sat til *Connect to an environment → Production* i Vercels projektindstillinger, så det følger automatisk nyeste produktions-deploy. Der skal **aldrig** køres `vercel alias set` på det igen: det ville pinne det til én deployment og genskabe fejlen nedenfor.
+### Deploy
+```bash
+git push origin main      # udløser automatisk et deploy
+```
+Det er alt. `rangefinderapp.vercel.app` er sat til *Connect to an environment → Production* i Vercels projektindstillinger og følger nyeste produktions-deploy af sig selv.
 
-**Navnehistorik:** Projektet hed oprindeligt `traeningsplan-app`, blev omdøbt til `range-finder` (navnet var taget) og endte som `rangefinderapp`. `traeningsplan-app.vercel.app` svarer stadig, men **skal ikke bruges**.
+> **Kør aldrig `vercel alias set` på det domæne.** Det pinner domænet til én bestemt deployment, og så serverer det gammel kode uden at nogen opdager det. Det skete tre gange den 5. september 2026, og hver gang gik der tid med at lede efter en fejl der ikke fandtes.
 
-**Fælden der bed tre gange (løst nu):** `rangefinderapp.vercel.app` var et manuelt alias. Manuelle aliaser følger ikke nye deploys, så domænet serverede timevis gammel kode mens nye deployments lå klar. Det så ud som om ændringer "ikke var pushet", og kostede hver gang tid på at lede efter en fejl der ikke fandtes. Rækkefølgen er: `git push` deployer ikke → et deploy flytter ikke et manuelt alias → tre uafhængige trin. Nu er der kun to, og det sidste sker af sig selv.
+`traeningsplan-app.vercel.app` svarer stadig (gammelt projektnavn) men skal ikke bruges.
 
----
+### Test at det virker
+```bash
+curl -s -m 90 -X POST https://rangefinderapp.vercel.app/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"sport":"lob","fitness_level":"Motionist","longest_session_km":10,"target_km":42,"plan_weeks":4,"goal_event":"maraton","language":"da"}'
+```
+Skal give en JSON-plan med fire uger. Tager 7-15 sek.
 
-## Kritisk fund: alle API-routes har været døde siden start
+### Prompt-validering — kør før du ændrer i prompten
+```bash
+ANTHROPIC_API_KEY=... node scripts/validate-generate.mjs
+```
+16 samples på tværs af sportsgrene, niveauer, planlængder og begge sprog. Exit 0/1, så den kan bruges som gate. Senest **16/16**.
 
-**Symptom:** `/api/scan` og `/api/generate` gav 404 i produktion — på ALLE deployments, inklusive 2 dage gamle, altså siden projektets første commit. Ingen opdagede det fordi ingen nogensinde lavede et ægte live-kald mod et `/api/*`-endpoint før i aften.
+```bash
+node scripts/sweep-plan-length.mjs        # find hvor lange planer knækker
+```
 
-**Root cause:** `vercel.json`'s route `{ "src": "/api/(.*)", "dest": "/api/$1" }` omskriver til en sti UDEN filendelse (`/api/generate`), men dette projekts build-pipeline (`@vercel/vc-build`) registrerer den deployede functions faktiske sti MED endelse (`api/generate.js`). Stierne matchede aldrig, så Vercel svarede med sin egen generiske 404 i stedet for at nå frem til koden.
-
-**Fix (pushet + live-verificeret, commit `b6d5146`):** Routen er nu `{ "src": "/api/(.*)", "dest": "/api/$1.js" }`. Bekræftet live: `curl -X OPTIONS https://rangefinderapp.vercel.app/api/generate` giver nu 200 (var 404 før fixet, på ALLE deployments inkl. 2 dage gamle). Routing er løst — men se den blokerende API-nøgle-fejl øverst i denne fil, som er det NÆSTE lag der stopper et ægte kald.
-
----
-
-## Hvad er faktisk bygget
-
-### `api/generate.js` — FÆRDIG, testet lokalt, ikke koblet til frontend
-- Model: `claude-haiku-4-5-20251001`, `max_tokens: 4096`, 40 sek. timeout pr. forsøg (1 retry ved parse-fejl)
-- Fase-allokering er **deterministisk kode** (`allocatePhases()`), ikke noget Claude selv regner ud — se "Prompt-validering" nedenfor for hvorfor
-- Rate limiting: in-memory Map, 5 req/IP/time (samme mønster som `api/scan.js`)
-- Server-side validering: ugyldig sport/fitnessniveau → 400, løbsdato i fortiden → 400, uger > 24 → capped med `"capped": true` i response
-- `goal_event` trunkeres til 200 tegn server-side (prompt-injection-mitigering)
-- Testet med 8 lokale cases (happy path × 2, alle 400-veje, cap-logik, rate limit) — alle bestod. Se commit `df07c5b` for detaljer.
-- **Live-testet efter routing-fixet:** routing virker (200 på OPTIONS), men selve Anthropic-kaldet fejler pga. API-nøgle-problemet øverst i denne fil. Koden er klar — kun nøglen mangler at blive rettet i Vercel.
-
-### Video-hero + fallback — LIVE
-- Fuldbredde baggrundsvideo på forsiden, 16:9 letterboxed på desktop (≥1025px), cover-fill på mindre skærme
-- Pause/play-knap nederst til højre i videoen
-- **Fallback-billede** (`hero-fallback.jpg`, udtrukket fra brugerens eget billede): hvis videoen ikke er startet at spille inden for 10 sek. (eller fejler), skiftes der automatisk til stillbilledet. Testet ved at fjerne videofilen midlertidigt og bekræfte skiftet sker.
-- Alle primære knapper (`.btn`) har gul tekst i stedet for hvid, for visuel sammenhæng
-
-### PLAN-fane fase-accordion — LIVE, gennemgået (eng-review + QA + design-review)
-- Uger grupperes nu korrekt i ~7 hovedfaser (ikke 14, se QA-rapport)
-- Screenshot-upload-boksen er genindført (var faldet ud i en tidligere refaktorering)
-- To separate produktionsbugs fundet og rettet undervejs — se "Reviews" nedenfor
-
-### Wizard → /api/generate — KOBLET 2026-09-05 (ikke deployet endnu)
-- "Generate plan" kalder nu `/api/generate` med wizardens felter og venter på det ægte svar. Ingen kunstig timer.
-- Enhver fejl (afvisning, 4xx/5xx, netværksfejl, 95 sek timeout, ugyldig plan) falder tilbage til `generatePlan()` og viser et gult banner der siger hvorfor.
-- Nyt felt i wizarden: **Fitness level** — `/api/generate` svarer 400 uden det.
-- Alle veje browser-verificeret mod en lokal stub-server. Selve Anthropic-kaldet er uverificeret indtil nøglen er deployet.
+### Lokal udvikling
+Der er ingen build. Åbn `index.html` direkte, eller server mappen. API-kald virker kun mod produktion, da nøglerne kun findes i Vercels **Production**-miljø — vil du teste lokalt, så tilføj dem til `development` og kør `vercel env pull`.
 
 ---
 
-## Prompt-validering (kør 2026-09-04) — vigtigt at forstå før man rører prompten
+## Arkitektur
 
-**Oprindelig CEO-plan-spec** (fase-tabel indlejret som prosa, Claude skal selv tælle/slå op): **4/15 sample-inputs bestod (27%)**. Haiku 4.5 følger ikke pålideligt en tekst-tabel til præcis optælling — fejlene spændte fra let forskudte uge-antal til fuldstændig usammenhængende faserækkefølger.
+```
+index.html            hele UI'et: state, render-funktioner, i18n, plan-algoritme
+  ├── I18N            126 nøgler pr. sprog, da + en
+  ├── generatePlan()  lokal algoritme — fallback når AI fejler
+  └── fetch → api/
 
-**Fix:** Flyttede faseberegningen til almindelig deterministisk kode (`allocatePhases()`, findes både i `api/generate.js` og i CEO-planen). Claude får nu at vide PRÆCIS hvilken fase hver uge har, og skal kun generere sessionsindhold. **Resultat: 14/15 (93%)** i første forsøg, den sidste fejl var en engangs-JSON-syntaksfejl der løste sig ved almindeligt retry.
+api/generate.js       plan fra bunden        (419 linjer)
+api/replan.js         justér efter pause     (220) — importerer fra generate.js
+api/scan.js           screenshot → sessioner  (99)
+```
 
-**Kendt uløst hul i selve fase-tabellen:** Reglen for uge 17-24 ("tilføj 1 BASE-uge, maks 8 BASE-uger totalt") siger intet om hvad der sker når loftet er nået men planen skal være længere endnu. Nuværende implementering fortsætter bare med at forlænge BASE forbi loftet. Bør genbesøges med en rigtig coachs input — se TODOS.md.
+### Sådan hænger en plangenerering sammen
 
-**Målt reel latency (vigtigt — modsiger CEO-planens antagelse om "2-5 sek"):**
-| Plan | Tid |
-|---|---|
-| 12 uger × 4 sessioner/uge | 14-16 sek |
-| 24 uger × 6 sessioner/uge | ~35 sek |
+1. Wizarden sender `{sport, fitness_level, longest_session_km, target_km, sessions_per_week, plan_weeks|race_date, goal_event, language}`
+2. Serveren regner **faserne ud i kode** (`allocatePhases()`) og fortæller modellen præcis hvilken fase hver uge har
+3. Claude udfylder kun sessionsindhold — navne, km, coach-noter
+4. `validatePlan()` afviser alt der ikke matcher: forkert ugetal, ændret fase, forkert tuple-form
+5. Fejler det, prøves én gang til; fejler det igen, falder frontenden tilbage til `generatePlan()` og fortæller brugeren hvorfor
 
-Dette er langt over de "2-5 sek" CEO-planen oprindeligt antog. Vercel Functions har heldigvis 300 sek. som platform-default med Fluid Compute (se nedenfor), så det er ikke et hårdt problem — men det betyder wizardens loading-skærm skal designes til reel ventetid på 15-35+ sek, ikke de 8 sek. den har lige nu.
+### Nøglekonstanter (`api/generate.js`)
+```
+MODEL                claude-haiku-4-5-20251001
+MAX_TOKENS           16000     (modellens reelle loft er 64000)
+MAX_WEEKS            24
+MAX_TOTAL_SESSIONS   100       uger × sessioner/uge — derover afvises AI-vejen
+CLAUDE_TIMEOUT_MS    40000     pr. forsøg, to forsøg
+RATE_LIMIT           5         pr. IP pr. time, in-memory
+PEAK_FRACTION        0.8       længste træning ≈ 80% af måldistancen
+```
 
 ---
 
-## Vercel-platform-viden (jeg havde forældet info om dette — ret det hvis du støder på det samme)
-**Antagelsen "Vercel Hobby = 10 sek. function timeout" er FORÆLDET.** Med Fluid Compute (default for alle nye projekter/planer) er grænsen 300 sek. på alle planer inklusive Hobby. Dette ændrer den oprindelige eng-review-anbefaling om et 8 sek. Anthropic-timeout — det er nu sat til 40 sek. i `api/generate.js`.
+## Det der kostede tid — læs dette før du ændrer noget
 
-**`functions` og `builds` i `vercel.json` er gensidigt udelukkende.** Dette projekt bruger det ældre `builds`-format (nødvendigt for den custom static-fil-routing). Det betyder `maxDuration` IKKE kan sættes eksplicit pr. function lige nu — den falder tilbage til platform-default (300 sek). Hvis I nogensinde migrerer væk fra `builds`-formatet, kan I sætte det eksplicit.
+### Faser skal beregnes i kode, ikke af modellen
+Den oprindelige prompt havde fasetabellen som prosa og lod Claude selv tælle uger: **4 af 15 samples bestod**. Flyttet til `allocatePhases()` i kode, hvor modellen får fasen for hver uge udleveret: **14 af 15**. Samme lektie gælder `api/replan.js`, hvor faserne er låst og valideres uændrede tilbage.
 
----
+**Enhver ny AI-funktion i dette projekt skal følge samme mønster:** struktur i kode, indhold fra modellen.
 
-## Reviews — status
+### Lange planer taber uger
+Over ~100 sessioner (uger × sessioner/uge) returnerer Haiku det forkerte antal uger — `stop_reason: end_turn`, ikke trunkering, og et retry redder det ikke. Derfor `MAX_TOTAL_SESSIONS`. Grænsen går på **sessioner, ikke uger**: 24 uger × 3 virker fint, 17 × 6 gør ikke.
 
-| Review | Status | Rapport |
-|---|---|---|
-| CEO Review | issues_open (scope besluttet) | `~/.gstack/projects/traeningsplan-app/ceo-plans/2026-09-03-ai-plan-generation.md` |
-| Eng Review | **CLEARED**, 9/9 fund løst | Samme fil, `## GSTACK REVIEW REPORT` nederst |
-| QA-only | **97/100**, 1 fund fikset, 1 åbent | `.gstack/qa-reports/qa-report-range-finder-2026-09-04.md` |
-| Design Review | **B+ / AI Slop: A**, 1 fund fikset, 1 deferred | `~/.gstack/projects/jcskoedt-range-finder/designs/design-audit-20260904/design-audit-range-finder.md` |
+### Vercel læser ikke `.gitignore`
+Uden `.vercelignore` uploades hele mappen. En 130MB fil i en urelateret mappe væltede et deploy med *"File size limit exceeded (100 MB)"*.
 
-To rigtige produktionsbugs blev fundet og rettet undervejs i eng-review (begge allerede live, ikke relateret til B1):
-1. Screenshot-upload-boksen var faldet ud af PLAN-fanen under en refaktorering
-2. `handleScreenshot()` kaldte tre ikke-eksisterende funktioner (`renderRoute`, `renderStats`, `renderWeeksList`) efter et vellykket import — var live siden den oprindelige commit
+### `vercel --prod` kan sige "Not authorized" og alligevel deploye
+Skete 5. september: CLI'en fejlede med exit 1, men deploymentet lå `Ready` i produktion. **Tjek `vercel ls rangefinderapp` før du fejlsøger en "fejlet" deploy.**
+
+### Tidszoner og sommertid
+`Math.ceil((dato - i_dag) / uge_i_ms)` gav 11 uger for 70 dage, fordi Danmark skifter CEST→CET undervejs — 70 dage er 70 dage *plus en time*. Tæl hele dage først: `Math.round(diff / 86400000)`. Både `weeksUntil()` i index.html og serveren gør det nu.
+
+### Clipboard mister tilladelsen når du venter
+`navigator.clipboard.writeText()` kræver at klikket stadig tæller som brugerhandling. Ventede vi på gzip-komprimeringen først, var tilladelsen brugt op og kopieringen fejlede altid. Delelinket forudberegnes nu ved render, så klikket kopierer synkront.
+
+### Flyt aldrig markup uden dens wiring
+Screenshot-importen blev engang efterladt uden `wireUploadArea()`, og `api/scan.js` var uopnåelig fra UI'et uden at nogen opdagede det. Da boksen blev flyttet fra PLAN- til Kalender-fanen, fulgte kaldet med.
 
 ---
 
 ## Uløste beslutninger
-1. **Strategisk:** Validerer AI-planer > algoritme-planer, før C (betaling/konti) bygges? Ikke afgjort — B1 bygges som AI uanset, men paywall-spørgsmålet for C er åbent.
-2. **Sikkerhed:** Implicit auth flow (access token i URL hash) accepteret som trade-off for B, genbesøg ved C.
-3. ~~**Feasibility:** max_tokens-loftet~~ — AFKLARET 2026-09-05. `client.models.retrieve` siger **64000** output-tokens for Haiku 4.5. De 4096 i koden var et gæt og trunkerede lange planer (de bruger op til 4693). Hævet til 16000.
-4. **Fase-tabel-hul:** Uge 21-24 BASE-loft-adfærd (se "Prompt-validering" ovenfor) — kræver coaching-fagligt input.
+
+1. **Er AI-planer bedre end algoritme-planer?** CEO-planen stiller spørgsmålet og besvarer det ikke. Der er endnu ikke én rigtig bruger der har gennemført en plan. **Det bør afgøres før C** — C er det dyreste stykke arbejde i planen og svært at rulle tilbage, når der først ligger brugerdata i en database.
+2. **Fase-tabellens hul for uge 21-24.** Reglen siger "tilføj 1 BASE-uge, maks 8 BASE-uger totalt", men ikke hvad der sker når loftet er nået og planen skal være længere. Koden forlænger bare BASE videre. Kræver en rigtig coach — en kandidatregel er at forlænge BUILD i stedet, men det er et gæt.
+3. **Sikkerhed ved C.** Implicit auth flow (token i URL-hash) blev accepteret som trade-off for B. Skal genbesøges.
 
 ---
 
-## Næste skridt (i rækkefølge)
+## Reviews
 
-1. **Redeploy + verificér nøglen** — se "BLOKERENDE" øverst. Intet AI-relateret kan verificeres før dette.
-2. ~~**Luk kontrakten frontend ↔ API**~~ — DONE 2026-09-05. Sport-aliaser, `target_km`, `sessions_per_week` og `apiPlanToLocalPlan()`. Se TODOS.md → "Kontrakt frontend ↔ API" for hvad der var i stykker og hvorfor.
-3. ~~**Kobl `/api/generate` til wizarden**~~ — DONE 2026-09-05. Kalder API'et, mapper via `apiPlanToLocalPlan()`, falder tilbage til `generatePlan()` på enhver fejl, og viser et banner der siger hvorfor. Alle syv veje er browser-verificeret mod en stub-server (se TODOS.md).
-4. ~~**Ret loading-skærmens tidsstyring**~~ — DONE 2026-09-05. Venter på det ægte svar; klient-timeout 95 sek.
-5. **Resterende wizard-felt:** løbsdato (valgfri dato). Fitnessniveau er bygget (det var påkrævet af API'et), og længste session fandtes allerede. Løbsdato dækkes funktionelt af "Time available" via `plan_weeks` — det er nu et UX-valg, ikke en blokering.
-6. **Coach-note-rendering:** `items[2]` vises i dag kun i den udfoldede detalje (`.item-note`). Skal frem som kursiv linje under sessionsnavnet.
-7. **Progress Ring** på I DAG-fanen — genbrug `plan.progress`/`computeStats()`, IKKE en ny localStorage-struktur (se eng-review-fund).
-8. **Email-felt** i wizarden (valgfrit, sidste felt) — kun til localStorage i B, ingen ekstern kald.
+| Review | Status | Rapport |
+|---|---|---|
+| CEO | issues_open (scope besluttet) | `~/.gstack/projects/traeningsplan-app/ceo-plans/2026-09-03-ai-plan-generation.md` |
+| Eng | CLEARED, 9/9 løst | samme fil, nederst |
+| QA-only | 97/100 | `.gstack/qa-reports/qa-report-range-finder-2026-09-04.md` |
+| Design | B+ / AI Slop: A | `~/.gstack/projects/jcskoedt-range-finder/designs/design-audit-20260904/` |
 
-### Sprog — løst 2026-09-05
-Sprogmikset er væk. Alle brugervendte strenge ligger i `I18N` i index.html, `t()` slår op, og DA/EN-knappen i baren øverst skifter hele siden inkl. datoer, tempo/ernæring og faseforklaring. Valget ligger i `localStorage` under `rf-lang`; første besøg følger browseren. `/api/generate` tager `language` og har en engelsk prompt-variant, så AI-planens indhold følger sproget.
+Design-reviewets FINDING-002 (manglende overskriftssemantik) er lukket 2026-09-05.
 
-Planer beholder det sprog de blev lavet på — sessionsnavne og coach-noter er data, ikke UI. Chrome skifter live, også på gamle planer.
+---
 
-`tempoFn`'s døde substring-matching er også rettet undervejs: den matchede på danske ord mens `generatePlan()` skrev engelske noter, så den ramte altid default-grenen. Items bærer nu en stabil `kind` på index 3 (`intervals`/`veryeasy`/`long`/`b2b`), og `tempoFn` skifter på den. AI-items har ingen `kind` og får default, hvilket er rigtigt for en coach-note i prosa.
+## Arbejdsgang
+
+**Alt laves og committes lokalt. Der pushes og deployes kun når Jacob eksplicit siger til.** Se `CLAUDE.md`.
+
+---
 
 ## Nøglefiler
 
 | Fil | Formål |
 |---|---|
-| `/Users/jacobcompenskodt/06RANGE_FINDER/index.html` | Single-file SPA |
-| `/Users/jacobcompenskodt/06RANGE_FINDER/api/generate.js` | AI-plangenerering — FÆRDIG, ikke koblet til frontend endnu |
-| `/Users/jacobcompenskodt/06RANGE_FINDER/api/scan.js` | Screenshot-import (eksisterende, virker) |
-| `/Users/jacobcompenskodt/06RANGE_FINDER/api/replan.js` | SKAL BYGGES — B2 (gated bag ≥1 bruger der beder om justering) |
-| `/Users/jacobcompenskodt/06RANGE_FINDER/vercel.json` | Routing — se "Kritisk fund" ovenfor før du ændrer i denne |
-| `/Users/jacobcompenskodt/06RANGE_FINDER/hero-fallback.jpg` | Video-fallback-billede |
-| `/Users/jacobcompenskodt/06RANGE_FINDER/TODOS.md` | Løbende opgaveliste, tjek "Kendte tekniske bekymringer" |
-| `~/.gstack/projects/traeningsplan-app/ceo-plans/2026-09-03-ai-plan-generation.md` | CEO-plan — kilde til sandhed for B1-spec, inkl. opdateret prompt-tilgang |
+| `index.html` | Hele frontenden — UI, i18n, lokal plan-algoritme |
+| `api/generate.js` | Plangenerering. Deler konstanter og helpers med replan |
+| `api/replan.js` | Justering efter sprungne uger |
+| `api/scan.js` | Screenshot → aktiviteter |
+| `scripts/validate-generate.mjs` | Prompt-gate, 16 samples, exit 0/1 |
+| `scripts/sweep-plan-length.mjs` | Finder hvor lange planer knækker |
+| `vercel.json` | Routing. Bruger det gamle `builds`-format — `functions` og `builds` udelukker hinanden |
+| `.vercelignore` | Vercel læser ikke `.gitignore` |
+| `TODOS.md` | Opgaveliste med begrundelser og fravalg |
+| `CLAUDE.md` | Instruktioner til AI-assistenter i dette repo |

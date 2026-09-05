@@ -1,5 +1,20 @@
 # RANGE FINDER — Project Instructions
 
+## Start her
+
+Læs `HANDOFF.md` først. Den forklarer hvad appen er, hvordan delene hænger sammen, hvordan man deployer og verificerer, og — vigtigst — hvilke fejl der allerede har kostet tid. `TODOS.md` har det åbne arbejde øverst og en changelog nedenunder.
+
+## To regler der ikke må brydes
+
+**1. Struktur i kode, indhold fra modellen.** Faser, ugetal og andet der skal være præcist beregnes i JavaScript og udleveres til Claude. Den oprindelige prompt lod modellen selv tælle: 4 af 15 samples bestod. Med faserne udleveret: 14 af 15. Enhver ny AI-funktion skal følge samme mønster.
+
+**2. Kør gaten før du rører en prompt.**
+```bash
+ANTHROPIC_API_KEY=... node scripts/validate-generate.mjs
+```
+16 samples, exit 0/1. Senest 16/16.
+
+
 ## Skill routing
 
 When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
