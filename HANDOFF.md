@@ -36,12 +36,11 @@ B1 er live og verificeret i produktion: wizarden kalder `/api/generate`, får ri
 **Arbejdsgang:** alt laves og committes lokalt først. Der pushes og deployes **kun** når Jacob eksplicit siger til — se CLAUDE.md. (Denne linje sagde tidligere "alt arbejde pushes direkte", hvilket var forkert.)
 **Vercel-projekt:** `rangefinderapp` (team: `range-finder`)
 
-**Navnehistorik (vigtig hvis noget ser forkert ud):** Projektet hed oprindeligt `traeningsplan-app`. Omdøbt 2026-09-04 → `range-finder` (taget af en anden bruger) → endte på `rangefinderapp`. Den gamle URL `traeningsplan-app.vercel.app` virker muligvis stadig midlertidigt som alias, men skal ikke bruges fremadrettet. `rangefinderapp.vercel.app` er en **manuel alias** (`vercel alias set`) — den følger IKKE automatisk nye deploys. Efter hver git push, tjek at aliaset peger på den nyeste deployment:
-```bash
-vercel ls rangefinderapp          # find nyeste "Ready" deployment
-vercel alias set <nyeste-url> rangefinderapp.vercel.app
-```
-Dette bør fikses permanent (se "Kendte tekniske gæld" nedenfor) i stedet for at gøre det manuelt hver gang.
+**Domænet er `rangefinderapp.vercel.app` — og kun det.** Fra 2026-09-05 er det sat til *Connect to an environment → Production* i Vercels projektindstillinger, så det følger automatisk nyeste produktions-deploy. Der skal **aldrig** køres `vercel alias set` på det igen: det ville pinne det til én deployment og genskabe fejlen nedenfor.
+
+**Navnehistorik:** Projektet hed oprindeligt `traeningsplan-app`, blev omdøbt til `range-finder` (navnet var taget) og endte som `rangefinderapp`. `traeningsplan-app.vercel.app` svarer stadig, men **skal ikke bruges**.
+
+**Fælden der bed tre gange (løst nu):** `rangefinderapp.vercel.app` var et manuelt alias. Manuelle aliaser følger ikke nye deploys, så domænet serverede timevis gammel kode mens nye deployments lå klar. Det så ud som om ændringer "ikke var pushet", og kostede hver gang tid på at lede efter en fejl der ikke fandtes. Rækkefølgen er: `git push` deployer ikke → et deploy flytter ikke et manuelt alias → tre uafhængige trin. Nu er der kun to, og det sidste sker af sig selv.
 
 ---
 

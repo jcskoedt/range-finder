@@ -26,9 +26,7 @@ Sidst opdateret: 2026-09-04
 
   *Fravalgt:* at dele lange planer i to kald og sy dem sammen. Det ville bevare AI-kvaliteten, men fordobler ventetiden til over 70 sek, hvilket er værre end en algoritme-plan der kommer straks.
 - [ ] **Måldistance-heuristikken rammer 12/13** (ekskl. 1-ugers planer, hvor der ikke er nogen opbygning at måle). Ratio længste træning / forventet 80%: mest 1,0, med enkelte på 0,63-0,75 og én på 1,25. God nok, men ikke præcis.
-- [ ] **Automatisér aliaset** — `rangefinderapp.vercel.app` skal sættes manuelt efter hvert deploy og har nu tre gange peget på gammel kode. Overvej at gøre `rangefinderapp` til produktionsdomænet i projektindstillingerne i stedet for et manuelt alias.
-
-  **Løsning:** sæt `rangefinderapp.vercel.app` som produktionsdomæne i Vercels projektindstillinger i stedet for et manuelt alias. Så peger det automatisk på nyeste produktions-deploy. Engangsindstilling, ingen kode.
+- [x] **Aliaset er automatiseret** — DONE 2026-09-05. `rangefinderapp.vercel.app` er sat til *Connect to an environment → Production* i projektindstillingerne og følger nu nyeste produktions-deploy af sig selv. Verificeret: domænet serverer ring, løbsdato, ernæring, ordliste og DST-rettelsen, og API'et svarer 200. **Kør aldrig `vercel alias set` på det domæne igen** — det ville pinne det forfra.
 - [ ] **`icon.svg` mangler en route i `vercel.json`** — `index.html` refererer til den, men catch-all-routen sender den til `index.html`. **Løsning:** én linje i `builds` (`{"src":"icon.svg","use":"@vercel/static"}`) og én i `routes` (`{"src":"/icon.svg","dest":"/icon.svg"}`), før catch-all-routen.
 
 - [x] **Kør prompt-validering** — DONE 2026-09-04. Original prompt (fase-tabel som prosa, Claude beregner selv): **4/15 (27%)** — Haiku følger ikke pålideligt en indlejret opslagstabel. Omskrev til deterministisk fase-allokering i kode + Claude fylder kun sessioner ind: **14/15 (93%)** på første forsøg, den sidste fejl (JSON-syntaksfejl) lykkedes på almindeligt retry. CEO-planens prompt-spec er opdateret med den nye tilgang — se "Prompt spec — REWRITTEN" i planen.

@@ -27,3 +27,9 @@ Key routing rules:
 - `git push` kræver at Jacob siger det. Ikke "skal jeg pushe?" efterfulgt af antaget ja — han skal sige det.
 - `vercel --prod` og `vercel alias set` kræver det samme. De er udadvendte og ændrer hvad brugere ser.
 - Rapportér altid hvad der ligger ucommittet/upushet, så han kan beslutte.
+
+## Domæne
+
+`rangefinderapp.vercel.app` er det eneste domæne der skal bruges. Det er sat til at følge Production automatisk (Vercel → Settings → Domains), så et produktions-deploy er nok.
+
+**Kør aldrig `vercel alias set` på det.** Det ville pinne domænet til én deployment, og så begynder det at servere gammel kode uden at nogen opdager det. Det skete tre gange den 5. september 2026.
