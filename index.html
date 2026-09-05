@@ -742,6 +742,11 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
   white-space:nowrap;min-width:72px;color:var(--text);
 }
 .psum-faq-desc{font-size:11px;color:#666;line-height:1.45;}
+.psum-faq-head{
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--subtle);margin-top:10px;padding-top:8px;border-top:1px solid #e8e8e8;
+}
+.psum-faq-head:first-child{border-top:none;padding-top:0;}
 
 /* ── PHASE PLAN ── */
 .phases-wrap{padding:0 0 32px;}
@@ -798,6 +803,12 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
   margin-top:3px;line-height:1.45;
 }
 .ps-item.done .ps-note{opacity:0.5;}
+.ps-fuel{font-size:11px;color:var(--subtle);margin-top:4px;line-height:1.45;}
+.ps-fuel-label{
+  text-transform:uppercase;font-size:9px;font-weight:700;letter-spacing:0.08em;
+  margin-right:6px;color:var(--text);opacity:0.55;
+}
+.ps-item.done .ps-fuel{opacity:0.5;}
 .ps-chevron{font-size:14px;color:var(--subtle);flex-shrink:0;}
 
 /* ── REFERENCE ── */
@@ -1022,7 +1033,14 @@ en:{
   this_week:"This week", next_week:"Next week",
   mark_done:"Mark complete · {km} km", planned:"/ {km} km planned",
   ph_name:"Name (e.g. Run)", ph_km:"Km",
-  phases_title:"What do the phases mean?",
+  phases_title:"Phases and terms",
+  phases_head:"Phases", terms_head:"Terms",
+  term_rpe_n:"RPE", term_rpe_d:"Rate of Perceived Exertion — how hard it feels, 1 to 10. 3 is conversational, 7 is hard, 10 is everything you have.",
+  term_zone2_n:"Zone 2", term_zone2_d:"Easy endurance pace. You can hold a conversation the whole way.",
+  term_sweetspot_n:"Sweet spot", term_sweetspot_d:"Just below your threshold — hard enough to move your fitness, easy enough to hold for 10-20 minutes.",
+  term_threshold_n:"Threshold", term_threshold_d:"The highest intensity you can hold for about an hour. Above it, lactate builds up fast.",
+  term_gel_n:"Gel", term_gel_d:"A small sachet of concentrated carbohydrate, around 20-25 g. Quick fuel mid-session — wash it down with water.",
+  term_carbload_n:"Carb-load", term_carbload_d:"Topping up your glycogen stores the day before a long one by eating extra pasta, rice or bread.",
   ph_base_d:"Builds the aerobic foundation — low intensity, high volume.",
   ph_build_d:"Intervals and tempo sessions prepare the body for race pace.",
   ph_peak_d:"Maximum load. This is you at your strongest.",
@@ -1079,19 +1097,27 @@ en:{
   tempo_svomning_long_near:"Steady easy pace, focus on maintaining technique throughout, RPE 3-5.",
   tempo_svomning_veryeasy:"Very easy, technique focus, RPE 2-3.",
   tempo_svomning_default:"Easy, technique focus, RPE 3-4.",
-  // nutrition
-  nut_cykling_200:"Familiar breakfast before you start. Water throughout, 60-90 g carbs/hour, electrolytes.",
-  nut_cykling_100:"Steady hydration + electrolytes. 60-90 g carbs/hour from the start.",
-  nut_cykling_70:"Steady hydration. 1-2 gels, approx. 40-60 g carbs/hour after the first hour.",
-  nut_cykling_40:"Bring water. Consider an energy bar if the ride approaches 90 min.",
-  nut_cykling_0:"Water only.",
-  nut_lob_30:"Water + electrolytes throughout. 30-60 g carbs/hour from the start.",
-  nut_lob_18:"Water throughout. 1 gel after 60 min, approx. 30-40 g carbs/hour after that.",
-  nut_lob_10:"Water is enough — maybe a sip or two if it's hot.",
-  nut_lob_0:"Water only.",
-  nut_svomning_6:"Electrolytes and fuel at rest stops/turns every 30-45 min.",
-  nut_svomning_3:"Water at rest stops. Consider some fuel if swimming continuously for over 60 min.",
-  nut_svomning_0:"Water at rest stops is enough.",
+  // fuelling — bands picked by distance; `before` is null when the session is
+  // short enough that eating beforehand does not matter
+  fuel_label:"Fuel", fuel_before_label:"Before",
+  fuel_cykling:[
+    {km:0,short:"Water",during:"Water is enough — you are under an hour in the saddle.",before:null},
+    {km:30,short:"1 bottle + a banana",during:"One bottle of water. Bring a banana or a bar if you will be out past 90 minutes.",before:null},
+    {km:60,short:"2 bottles + 2-3 bars",during:"Two bottles. Eat something every 45 minutes — banana, bar or gel.",before:"Eat 2-3 hours before: oats, bread or pasta."},
+    {km:100,short:"2-3 bottles + a gel every 30 min",during:"Two to three bottles with electrolytes. 60-90 g carbs per hour, so roughly a gel or bar every half hour.",before:"Large carbohydrate meal 3 hours before. Start drinking properly the day before."},
+    {km:160,short:"Plan a refuelling stop",during:"Electrolytes in every bottle and 60-90 g carbs per hour. Plan a stop to refill — you cannot carry enough from home.",before:"Carb-load the day before. Familiar breakfast 3 hours before — never try anything new on race day."},
+  ],
+  fuel_lob:[
+    {km:0,short:"Water",during:"Water is enough. Drink afterwards.",before:null},
+    {km:8,short:"Water on the way",during:"Carry water or route past a fountain. A banana afterwards.",before:null},
+    {km:15,short:"Water + 1-2 gels",during:"Water on the way. 1-2 gels — around 30-40 g carbs per hour after the first hour.",before:"Light carbohydrate meal 2-3 hours before: oats, bread or a banana."},
+    {km:25,short:"Water + a gel every 30-40 min",during:"Water with electrolytes. 30-60 g carbs per hour from the start, so a gel every 30-40 minutes.",before:"Carb-load the evening before. Familiar breakfast 2-3 hours before the run."},
+  ],
+  fuel_svomning:[
+    {km:0,short:"Water at the wall",during:"A bottle at the poolside. That is all you need.",before:null},
+    {km:2,short:"Water + food afterwards",during:"Drink at the wall between sets. Eat carbs and protein within an hour afterwards.",before:null},
+    {km:4,short:"Fuel every 30-45 min",during:"Bottle at the wall. Take on fuel every 30-45 minutes at the turns — gel or sports drink.",before:"Light meal 2 hours before. Not right before — you should not swim on a full stomach."},
+  ],
 },
 da:{
   tick_1:"Konsistens slår perfektion", tick_2:"Hver træning tæller", tick_3:"Hvile er en del af planen",
@@ -1141,7 +1167,14 @@ da:{
   this_week:"Denne uge", next_week:"Næste uge",
   mark_done:"Marker gennemført · {km} km", planned:"/ {km} km planlagt",
   ph_name:"Navn (fx Løbetur)", ph_km:"Km",
-  phases_title:"Hvad betyder faserne?",
+  phases_title:"Faser og begreber",
+  phases_head:"Faser", terms_head:"Begreber",
+  term_rpe_n:"RPE", term_rpe_d:"Rate of Perceived Exertion — hvor hårdt det føles, på en skala fra 1 til 10. 3 er snakketempo, 7 er hårdt, 10 er alt hvad du har.",
+  term_zone2_n:"Zone 2", term_zone2_d:"Rolig udholdenhedsfart. Du kan holde en samtale i gang hele vejen.",
+  term_sweetspot_n:"Sweet spot", term_sweetspot_d:"Lige under din tærskel — hårdt nok til at rykke formen, roligt nok til at du kan holde det i 10-20 minutter.",
+  term_threshold_n:"Tærskel", term_threshold_d:"Den højeste intensitet du kan holde i cirka en time. Over den samler mælkesyren sig hurtigt.",
+  term_gel_n:"Gel", term_gel_d:"En lille pose koncentreret kulhydrat, cirka 20-25 g. Hurtig energi undervejs — skyl den ned med vand.",
+  term_carbload_n:"Carb-load", term_carbload_d:"At fylde kulhydratdepoterne op dagen før en lang tur ved at spise ekstra pasta, ris eller brød.",
   ph_base_d:"Opbygger det aerobe fundament — lav intensitet, høj volumen.",
   ph_build_d:"Intervaller og tempo-ture forbereder kroppen til race-pace.",
   ph_peak_d:"Maksimal belastning. Du er nu på dit allerstærkeste.",
@@ -1192,18 +1225,25 @@ da:{
   tempo_svomning_long_near:"Jævnt roligt tempo, hold teknikken hele vejen, RPE 3-5.",
   tempo_svomning_veryeasy:"Meget rolig, fokus på teknik, RPE 2-3.",
   tempo_svomning_default:"Rolig, fokus på teknik, RPE 3-4.",
-  nut_cykling_200:"Kendt morgenmad inden start. Vand undervejs, 60-90 g kulhydrat i timen, elektrolytter.",
-  nut_cykling_100:"Jævn væskeindtagelse + elektrolytter. 60-90 g kulhydrat i timen fra start.",
-  nut_cykling_70:"Jævn væskeindtagelse. 1-2 gels, ca. 40-60 g kulhydrat i timen efter den første time.",
-  nut_cykling_40:"Tag vand med. Overvej en energibar hvis turen nærmer sig 90 min.",
-  nut_cykling_0:"Kun vand.",
-  nut_lob_30:"Vand + elektrolytter undervejs. 30-60 g kulhydrat i timen fra start.",
-  nut_lob_18:"Vand undervejs. 1 gel efter 60 min, derefter ca. 30-40 g kulhydrat i timen.",
-  nut_lob_10:"Vand er nok — måske en slurk eller to hvis det er varmt.",
-  nut_lob_0:"Kun vand.",
-  nut_svomning_6:"Elektrolytter og energi ved pauser/vendinger hver 30-45 min.",
-  nut_svomning_3:"Vand ved pauser. Overvej energi hvis du svømmer over 60 min i træk.",
-  nut_svomning_0:"Vand ved pauser er nok.",
+  fuel_label:"Ernæring", fuel_before_label:"Før træning",
+  fuel_cykling:[
+    {km:0,short:"Vand",during:"Vand er nok — du er under en time i sadlen.",before:null},
+    {km:30,short:"1 flaske + en banan",during:"Én flaske vand. Tag en banan eller en bar med, hvis du er ude over halvanden time.",before:null},
+    {km:60,short:"2 flasker + 2-3 barer",during:"To flasker. Spis noget hvert 45. minut — banan, bar eller gel.",before:"Spis 2-3 timer før: havregryn, brød eller pasta."},
+    {km:100,short:"2-3 flasker + en gel hver 30. min",during:"To-tre flasker med elektrolytter. 60-90 g kulhydrat i timen, altså cirka en gel eller bar hver halve time.",before:"Stort kulhydratmåltid 3 timer før. Drik rigeligt allerede dagen inden."},
+    {km:160,short:"Planlæg et madstop",during:"Elektrolytter i alle flasker og 60-90 g kulhydrat i timen. Planlæg et stop til påfyldning — du kan ikke bære nok med hjemmefra.",before:"Carb-load dagen før. Kendt morgenmad 3 timer før — prøv aldrig noget nyt på løbsdagen."},
+  ],
+  fuel_lob:[
+    {km:0,short:"Vand",during:"Vand er nok. Drik bagefter.",before:null},
+    {km:8,short:"Vand undervejs",during:"Tag vand med, eller læg ruten forbi et vandpost. En banan bagefter.",before:null},
+    {km:15,short:"Vand + 1-2 gels",during:"Vand undervejs. 1-2 gels — cirka 30-40 g kulhydrat i timen efter den første time.",before:"Let kulhydratmåltid 2-3 timer før: havregryn, brød eller en banan."},
+    {km:25,short:"Vand + en gel hver 30-40. min",during:"Vand med elektrolytter. 30-60 g kulhydrat i timen fra start, altså en gel hvert 30.-40. minut.",before:"Carb-load aftenen før. Kendt morgenmad 2-3 timer før løbet."},
+  ],
+  fuel_svomning:[
+    {km:0,short:"Vand ved kanten",during:"En drikkeflaske ved bassinkanten. Det er alt, du har brug for.",before:null},
+    {km:2,short:"Vand + noget bagefter",during:"Drik ved kanten mellem sæt. Spis kulhydrat og protein inden for en time bagefter.",before:null},
+    {km:4,short:"Energi hver 30-45. min",during:"Drikkeflaske ved kanten. Tag energi hvert 30.-45. minut ved vendingerne — gel eller sportsdrik.",before:"Let måltid 2 timer før. Ikke lige inden — du skal ikke svømme på fuld mave."},
+  ],
 }
 };
 
@@ -1251,29 +1291,33 @@ function tempoFor(sk,km,kind){
   if(kind==="veryeasy")return t("tempo_"+sk+"_veryeasy");
   return t("tempo_"+sk+"_default");
 }
-function nutritionFor(sk,km){
-  const steps={cykling:[200,100,70,40],lob:[30,18,10],svomning:[6,3]}[sk];
-  for(const step of steps)if(km>=step)return t("nut_"+sk+"_"+step);
-  return t("nut_"+sk+"_0");
+// Picks the fuelling band for a session: `short` for the plan list, `during`
+// for the detail, `before` only when the session is long enough that what you
+// ate beforehand actually matters.
+function fuelFor(sk,km){
+  const bands=t("fuel_"+sk);
+  let hit=bands[0];
+  for(const b of bands)if(km>=b.km)hit=b;
+  return hit;
 }
 const SPORTS = {
   cykling: {
     get label(){return t("sport_cykling");},
     get intervalSchemes(){return t("ivl_cykling");},
     tempoFn:(label,km,note,kind)=>tempoFor("cykling",km,kind),
-    nutritionFn:(km)=>nutritionFor("cykling",km)
+    fuelFn:(km)=>fuelFor("cykling",km)
   },
   lob: {
     get label(){return t("sport_lob");},
     get intervalSchemes(){return t("ivl_lob");},
     tempoFn:(label,km,note,kind)=>tempoFor("lob",km,kind),
-    nutritionFn:(km)=>nutritionFor("lob",km)
+    fuelFn:(km)=>fuelFor("lob",km)
   },
   svomning: {
     get label(){return t("sport_svomning");},
     get intervalSchemes(){return t("ivl_svomning");},
     tempoFn:(label,km,note,kind)=>tempoFor("svomning",km,kind),
-    nutritionFn:(km)=>nutritionFor("svomning",km)
+    fuelFn:(km)=>fuelFor("svomning",km)
   }
 };
 
@@ -1940,9 +1984,11 @@ function renderTabToday(plan,c){
   let guideHtml="";
   if(ts){
     const[label,km,note,kind]=ts.item;
+    const todayFuel=sport.fuelFn(km);
     guideHtml=`<div class="today-guide">
       <div class="today-guide-row"><div class="today-guide-label">${t("pace")}</div><div>${sport.tempoFn(label,km,note,kind)}</div></div>
-      <div class="today-guide-row"><div class="today-guide-label">${t("nutrition")}</div><div>${sport.nutritionFn(km)}</div></div>
+      <div class="today-guide-row"><div class="today-guide-label">${t("nutrition")}</div><div>${todayFuel.during}</div></div>
+      ${todayFuel.before?`<div class="today-guide-row"><div class="today-guide-label">${t("fuel_before_label")}</div><div>${todayFuel.before}</div></div>`:""}
       ${note?`<div class="today-guide-row"><div class="today-guide-label">${t("note")}</div><div>${note}</div></div>`:""}
     </div>`;
   }
@@ -2146,6 +2192,7 @@ function renderTabPlan(plan,c){
           const sd=getSessionDate(plan,openWeekIdx,i);
           const dateStr=sd?fmtDate(sd):'';
           const isExp=openItemKey===ikey;
+          const fuel=sport.fuelFn(km);
           sessHtml+=`<div class="ps-item${p.done?' done':''}">
             <div class="ps-row" data-expand="${ikey}" style="cursor:pointer;">
               <div class="checkbox${p.done?' checked':''}" data-cb="${ikey}" data-weekidx="${openWeekIdx}" data-i="${i}" data-km="${km}"></div>
@@ -2153,12 +2200,14 @@ function renderTabPlan(plan,c){
                 ${dateStr?`<div class="item-date">${dateStr}</div>`:''}
                 <div class="ps-label${p.done?' checked':''}">${label} · ${fmtKm(km)} km</div>
                 ${note?`<div class="ps-note">${note}</div>`:''}
+                <div class="ps-fuel"><span class="ps-fuel-label">${t("fuel_label")}</span>${fuel.short}</div>
               </div>
               <div class="ps-chevron">${isExp?'−':'+'}</div>
             </div>
             <div class="item-detail${isExp?' open':''}">
               <div class="item-meta"><span class="meta-label">${t("pace")}</span>${sport.tempoFn(label,km,note,kind)}</div>
-              <div class="item-meta"><span class="meta-label">${t("nutrition")}</span>${sport.nutritionFn(km)}</div>
+              <div class="item-meta"><span class="meta-label">${t("nutrition")}</span>${fuel.during}</div>
+              ${fuel.before?`<div class="item-meta"><span class="meta-label">${t("fuel_before_label")}</span>${fuel.before}</div>`:''}
               <div class="item-km" style="margin-top:12px;">
                 <input type="number" inputmode="numeric" value="${p.actualKm!=null?p.actualKm:km}" data-inp="${ikey}" data-km="${km}"/>
                 <span class="planned">${t("planned",{km:fmtKm(km)})}</span>
@@ -2196,11 +2245,14 @@ function renderTabPlan(plan,c){
     <details class="psum-faq">
       <summary class="psum-faq-toggle">${t("phases_title")}</summary>
       <div class="psum-faq-body">
+        <div class="psum-faq-head" style="margin-top:0;">${t("phases_head")}</div>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_BASE")}</span><span class="psum-faq-desc">${t("ph_base_d")}</span></div>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_BUILD")}</span><span class="psum-faq-desc">${t("ph_build_d")}</span></div>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_PEAK")}</span><span class="psum-faq-desc">${t("ph_peak_d")}</span></div>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_TAPER")}</span><span class="psum-faq-desc">${t("ph_taper_d")}</span></div>
         <div class="psum-faq-row"><span class="psum-faq-name">${t("api_RACE WEEK")}</span><span class="psum-faq-desc">${t("ph_race_d")}</span></div>
+        <div class="psum-faq-head">${t("terms_head")}</div>
+        ${["rpe","zone2","sweetspot","threshold","gel","carbload"].map(k=>`<div class="psum-faq-row"><span class="psum-faq-name">${t("term_"+k+"_n")}</span><span class="psum-faq-desc">${t("term_"+k+"_d")}</span></div>`).join("")}
       </div>
     </details>
   </div>
