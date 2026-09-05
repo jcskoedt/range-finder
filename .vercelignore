@@ -14,3 +14,4 @@ screenshots/
 # Source assets that no route in vercel.json points at
 RANGE_FINDER_LOGO.png
 icon-1024.png
+.DS_Store
