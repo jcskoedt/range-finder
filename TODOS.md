@@ -5,52 +5,11 @@ Sidst opdateret: 2026-09-04
 
 ## 🔴 Gør nu
 
-- [ ] **BLOKERENDE: Ret ANTHROPIC_API_KEY i Vercel** — alle `/api/generate`- og `/api/scan`-kald fejler i produktion.
+- [x] **BLOKERENDE: Ret ANTHROPIC_API_KEY** — LØST 2026-09-05. `ANTHROPIC_WORKSPACE_ID` sat i Vercel (Production), `api/scan.js` fik samme header. Verificeret med tre ægte kald i produktion mod dansk, engelsk og alle tre sportsgrene — se HANDOFF.md.
+- [ ] **Kør prompt-valideringen igen** — de 93% gælder en prompt der siden er ændret to gange (måldistance tilføjet, engelsk variant tilføjet). Tre stikprøver i produktion så rigtige ud, men det er ikke en måling.
+- [ ] **Automatisér aliaset** — `rangefinderapp.vercel.app` skal sættes manuelt efter hvert deploy og har nu tre gange peget på gammel kode. Overvej at gøre `rangefinderapp` til produktionsdomænet i projektindstillingerne i stedet for et manuelt alias.
+- [ ] **`icon.svg` mangler en route i `vercel.json`** — `index.html` refererer til den, men catch-all-routen sender den til `index.html`.
 
-  **Bekræftet igen 2026-09-05.** `curl` mod produktion giver `{"error":"generation_failed"}` (HTTP 500) efter ~1 sek. Så hurtigt svar betyder at kaldet fejler på auth, ikke timeout — en rigtig generering tager 14-35 sek. `vercel env ls` viser at kun `ANTHROPIC_API_KEY` findes; `ANTHROPIC_WORKSPACE_ID` er ikke sat. Fejlteksten fra produktionsloggen: *"This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header…"*
-
-  ### Mulighed A — ny workspace-scoped nøgle (anbefalet)
-  Ingen ekstra env-var at vedligeholde, og den retter `/api/scan` samtidig.
-
-  - [ ] console.anthropic.com → Settings → API keys → **Create key**
-  - [ ] Vælg et **specifikt workspace** i Workspace-dropdownen — ikke org-/default-niveau. Det er præcis dette trin der gik galt sidst.
-  - [ ] Kopiér nøglen (`sk-ant-…`) — den vises kun én gang
-  - [ ] Udskift i Vercel:
-    ```bash
-    cd /Users/jacobcompenskodt/06RANGE_FINDER
-    vercel env rm ANTHROPIC_API_KEY production
-    vercel env add ANTHROPIC_API_KEY production    # indsæt den nye nøgle når den sprørger
-    ```
-
-  ### Mulighed B — behold nøglen, tilføj workspace-ID
-  `api/generate.js` sender allerede headeren automatisk hvis variablen findes (se toppen af filen). **`api/scan.js` gør IKKE** — den skal rettes tilsvarende, ellers bliver screenshot-import ved med at fejle.
-
-  - [ ] console.anthropic.com → skift til det ønskede workspace → kopiér workspace-ID fra URL’en (`…/workspaces/<ID>/…`)
-  - [ ] `vercel env add ANTHROPIC_WORKSPACE_ID production`
-  - [ ] Kopiér workspace-header-blokken fra toppen af `api/generate.js` ind i `api/scan.js`
-
-  ### Derefter — uanset hvilken mulighed du valgte
-  - [ ] **Env-vars findes kun i Production.** Preview-deploys og `vercel dev` har ingen nøgle overhovedet, så AI-funktioner kan hverken testes lokalt eller i preview:
-    ```bash
-    vercel env add ANTHROPIC_API_KEY preview
-    vercel env add ANTHROPIC_API_KEY development
-    vercel env pull .env.local
-    ```
-  - [ ] **Redeploy** — env-ændringer slår ikke igennem på eksisterende deployments:
-    ```bash
-    vercel --prod
-    vercel ls rangefinderapp                       # find nyeste "Ready" deployment
-    vercel alias set <nyeste-url> rangefinderapp.vercel.app
-    ```
-    (Aliaset er manuelt og følger ikke nye deploys — se HANDOFF.md.)
-  - [ ] **Verificér** — skal give en JSON-plan (HTTP 200), ikke `generation_failed`:
-    ```bash
-    curl -s -m 90 -X POST https://rangefinderapp.vercel.app/api/generate \
-      -H "Content-Type: application/json" \
-      -d '{"sport":"lob","fitness_level":"Motionist","longest_session_km":10,"target_km":42,"plan_weeks":4,"goal_event":"maraton"}'
-    ```
-    `"sport":"lob"` og `"target_km"` er nye i kontrakten efter trin 1 (2026-09-05). Svaret skal indeholde `"sport":"løb"` (kanonisk dansk) og præcis 4 uger.
-  - [ ] **Kør prompt-valideringen igen** — trin 1 ændrede prompten (måldistance tilføjet). De 93% er målt på den gamle prompt. Se "Kendte tekniske bekymringer" nederst.
 - [x] **Kør prompt-validering** — DONE 2026-09-04. Original prompt (fase-tabel som prosa, Claude beregner selv): **4/15 (27%)** — Haiku følger ikke pålideligt en indlejret opslagstabel. Omskrev til deterministisk fase-allokering i kode + Claude fylder kun sessioner ind: **14/15 (93%)** på første forsøg, den sidste fejl (JSON-syntaksfejl) lykkedes på almindeligt retry. CEO-planens prompt-spec er opdateret med den nye tilgang — se "Prompt spec — REWRITTEN" i planen.
 
 ---

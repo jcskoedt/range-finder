@@ -1,31 +1,32 @@
 # Range Finder — Handoff
 Sidst opdateret: 2026-09-05 (sprogskifter)
 
-## ⚠️ BLOKERENDE — ét trin tilbage
-`ANTHROPIC_API_KEY` er en org-nøgle uden workspace-scope, så Anthropic afviser alle kald fra `api/generate.js` og `api/scan.js` med:
-> "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header..."
+## ✅ BLOKEREN ER VÆK — verificeret i produktion 2026-09-05
 
-**Status 2026-09-05:** Mulighed B er valgt og halvvejs udført.
-- ✅ `ANTHROPIC_WORKSPACE_ID` er sat i Vercel (Production) — bekræftet med `vercel env ls`
-- ✅ `api/scan.js` sender nu samme workspace-header som `generate.js` (den manglede — screenshot-import ville ellers være blevet ved med at fejle)
-- ⬜ **Mangler: redeploy.** Env-ændringer slår ikke igennem på eksisterende deployments. Kør:
-  ```bash
-  cd /Users/jacobcompenskodt/06RANGE_FINDER
-  vercel --prod
-  vercel ls rangefinderapp                       # find nyeste "Ready" deployment
-  vercel alias set <nyeste-url> rangefinderapp.vercel.app
-  ```
-- ⬜ **Mangler: verifikation.** Skal give en JSON-plan (HTTP 200), ikke `generation_failed`:
-  ```bash
-  curl -s -m 90 -X POST https://rangefinderapp.vercel.app/api/generate \
-    -H "Content-Type: application/json" \
-    -d '{"sport":"lob","fitness_level":"Motionist","longest_session_km":10,"target_km":42,"plan_weeks":4,"goal_event":"maraton"}'
-  ```
+`ANTHROPIC_API_KEY` er en org-nøgle uden workspace-scope. Løst med Mulighed B: `ANTHROPIC_WORKSPACE_ID` sat i Vercel (Production), og `api/scan.js` fik samme header som `generate.js` (den manglede).
 
-Bemærk: env-vars findes kun i **Production**. Preview og `vercel dev` har ingen nøgle, så AI-funktioner kan ikke testes lokalt eller i preview før de også tilføjes der. Se TODOS.md for kommandoerne.
+**Første vellykkede ægte Anthropic-kald i projektets historie**, mod `https://rangefinderapp.vercel.app/api/generate`:
+
+| Test | Resultat |
+|---|---|
+| Løb, 42 km, 4 uger, dansk | HTTP 200 på 6,9 sek. Faser BASE/BUILD/BUILD/TAPER matcher `allocatePhases(4)`. Længste tur 34 km = 80% af målet. Maraton 42 km i sidste uge. |
+| Cykling, 200 km, engelsk | Engelsk planindhold. Længste tur 160 km = præcis 80% af målet. 5 sessioner/uge for "Erfaren". |
+| Svømning, 5 km, Begynder | 3 sessioner/uge. Decimaler (0,75/1,25/2,5 km) — netop det tilfælde `fmtKm()` blev lavet til. |
+
+`sport: "lob"` accepteres og returneres som `"løb"`. Måldistancen styrer opbygningen. Latency er 7-10 sek, altså markant hurtigere end de 14-35 sek der blev målt lokalt.
+
+### Faldgruber ved deploy — læs før næste gang
+1. **Vercel læser ikke `.gitignore`.** Uden `.vercelignore` blev `FIG/` (149MB) uploadet og deployet fejlede med "File size limit exceeded (100 MB)". `.vercelignore` findes nu; upload er 33MB.
+2. **`vercel --prod` kan sige "Not authorized" OG alligevel deploye.** Det skete 2026-09-05: CLI'en fejlede med exit 1, men deploymentet lå `Ready` i produktion. **Tjek altid `vercel ls rangefinderapp` før du fejlsøger** — fejlen kommer fra et efterfølgende trin, ikke fra selve deployet.
+3. **Aliaset følger ikke nye deploys.** `rangefinderapp.vercel.app` pegede stadig på en 11 timer gammel deployment og svarede 500, mens den nye kode var live på `traeningsplan-app.vercel.app`. Efter hvert deploy:
+   ```bash
+   vercel ls rangefinderapp
+   vercel alias set <nyeste-url> rangefinderapp.vercel.app
+   ```
+   Bør automatiseres — det er tredje gang det bider.
 
 ## Status i én sætning
-Alle plan-reviews er clearet, `api/generate.js` er bygget, routing-buggen er rettet, og kontrakten mellem frontend og API er lukket (2026-09-05) — men nøglefixet mangler et redeploy før noget AI-relateret kan verificeres, Wizarden kalder nu `/api/generate` med algoritmen som fallback (browser-verificeret mod en stub), men det ægte Anthropic-kald er aldrig lykkedes endnu.
+B1 er live og verificeret i produktion: wizarden kalder `/api/generate`, får rigtige AI-planer fra Claude Haiku på dansk eller engelsk, og falder tilbage til den lokale algoritme ved enhver fejl. Tilbage står prompt-validering af den ændrede prompt, samt B2 og C.
 
 ---
 
