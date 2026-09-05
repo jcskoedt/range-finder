@@ -13,7 +13,13 @@ const client = new Anthropic({
 });
 
 const MODEL = "claude-haiku-4-5-20251001";
-const MAX_TOKENS = 4096;
+// Haiku 4.5's real ceiling is 64000 output tokens (confirmed 2026-09-05 via
+// client.models.retrieve, not assumed). 4096 was a guess and it truncated the
+// longest plans: the plan-length sweep hit stop_reason "max_tokens" from 22
+// weeks x 6 sessions upward. 16000 is the SDK's recommended non-streaming
+// default — enough headroom for a 24-week, 6-session plan (~6k tokens) while
+// staying clear of HTTP timeouts. You pay per token generated, not per cap.
+const MAX_TOKENS = 16000;
 // Measured real latency (2026-09-04): 12 weeks/4 sessions ~14-16s, 24 weeks/6
 // sessions ~35s. Vercel Functions default to a 300s limit with Fluid Compute
 // (all plans, including Hobby) — NOT the old 10s Hobby limit. 40s per attempt

@@ -127,7 +127,7 @@ To rigtige produktionsbugs blev fundet og rettet undervejs i eng-review (begge a
 ## Uløste beslutninger
 1. **Strategisk:** Validerer AI-planer > algoritme-planer, før C (betaling/konti) bygges? Ikke afgjort — B1 bygges som AI uanset, men paywall-spørgsmålet for C er åbent.
 2. **Sikkerhed:** Implicit auth flow (access token i URL hash) accepteret som trade-off for B, genbesøg ved C.
-3. **Feasibility:** `claude-haiku-4-5-20251001`'s reelle max_tokens-loft er ikke verificeret mod Anthropics dokumentation — antaget at 4096 er sikkert, ikke bekræftet mod et højere loft.
+3. ~~**Feasibility:** max_tokens-loftet~~ — AFKLARET 2026-09-05. `client.models.retrieve` siger **64000** output-tokens for Haiku 4.5. De 4096 i koden var et gæt og trunkerede lange planer (de bruger op til 4693). Hævet til 16000.
 4. **Fase-tabel-hul:** Uge 21-24 BASE-loft-adfærd (se "Prompt-validering" ovenfor) — kræver coaching-fagligt input.
 
 ---

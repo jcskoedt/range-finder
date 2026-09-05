@@ -8,7 +8,17 @@ Sidst opdateret: 2026-09-04
 - [x] **BLOKERENDE: Ret ANTHROPIC_API_KEY** — LØST 2026-09-05. `ANTHROPIC_WORKSPACE_ID` sat i Vercel (Production), `api/scan.js` fik samme header. Verificeret med tre ægte kald i produktion mod dansk, engelsk og alle tre sportsgrene — se HANDOFF.md.
 - [x] **Prompt-validering kørt igen** — 2026-09-05, efter måldistance + engelsk variant. **15/16 gyldige (94%)**, 14/16 i første forsøg. Ingen regression fra de 93% før ændringerne. Kør igen med `node scripts/validate-generate.mjs`.
 - [x] **`scripts/validate-generate.mjs` skrevet** — den udskudte opgave fra eng-review. Kalder Anthropic direkte med endpointets egne funktioner (importeret, ikke kopieret), så rate limiten ikke er i vejen. 16 samples på tværs af sportsgrene, niveauer, planlængder og begge sprog. Exit-kode 0/1, så den kan bruges som gate.
-- [ ] **Lange planer taber en uge.** Begge kørsler fejlede på den længste/tætteste plan — 20u×5 og 24u×6 sessioner. Fejlen er ikke trunkering (`stop_reason: end_turn`), modellen returnerer bare 23 uger i stedet for 24. Retry hjælper ikke. Appen falder tilbage til algoritmen, så brugeren får en plan, men ikke en AI-plan. **Overvej at cappe AI-planer ved ~16-20 uger** og lade algoritmen tage de længste. Bekræfter den gamle bekymring om lange planer, men årsagen er optælling, ikke max_tokens.
+- [x] **`max_tokens` var sat 16x for lavt** — RETTET 2026-09-05. Koden brugte 4096; Haiku 4.5's reelle loft er **64000** (bekræftet med `client.models.retrieve`, ikke antaget — det lukker det åbne spørgsmål i HANDOFF). Lange planer bruger op til 4693 output-tokens, så de blev trunkeret. Hævet til 16000 (SDK'ets anbefaling for ikke-streamende kald). Efter ændringen optræder `stop_reason: max_tokens` ikke længere i nogen kørsel. Det koster intet ekstra — man betaler pr. genereret token, ikke pr. loft.
+- [ ] **Cap AI-planer på ANTAL SESSIONER, ikke uger.** Sweep over planlængde (`node scripts/sweep-plan-length.mjs`, 9 punkter x 3 forsøg) viser at pålideligheden følger uger x sessioner/uge, ikke uger alene:
+
+  | sessioner i alt | bestået |
+  |---|---|
+  | 48-72 | 3/3, 3/3, 3/3 |
+  | 96-108 | 2/3, 3/3, 2/3 |
+  | 120-144 | 1/3, 0/3, 1/3 |
+
+  24 uger x 3 sessioner (72 i alt) er 3/3, mens 20 uger x 6 (120) er 1/3 — en uge-baseret cap ville udelukke gode planer og slippe dårlige igennem. Fejlen er altid den samme: modellen returnerer et forkert antal uger (`stop_reason: end_turn`), og retry redder den ikke. **Foreslået grænse: ~100 sessioner.** Derover bør algoritmen tage over. Appen falder allerede tilbage, så brugeren får en plan uanset — det her handler om at undgå spildte 35-sekunders ventetider.
+- [ ] **Server-timeouten er tæt på.** Lange planer tager 35 sek i snit at generere, og `CLAUDE_TIMEOUT_MS` er 40 sek. Hæves den, skal frontendens 95 sek klient-timeout følge med — serveren laver to forsøg, så 2 x 55 sek ville overskride den.
 - [ ] **Måldistance-heuristikken rammer 12/13** (ekskl. 1-ugers planer, hvor der ikke er nogen opbygning at måle). Ratio længste træning / forventet 80%: mest 1,0, med enkelte på 0,63-0,75 og én på 1,25. God nok, men ikke præcis.
 - [ ] **Automatisér aliaset** — `rangefinderapp.vercel.app` skal sættes manuelt efter hvert deploy og har nu tre gange peget på gammel kode. Overvej at gøre `rangefinderapp` til produktionsdomænet i projektindstillingerne i stedet for et manuelt alias.
 - [ ] **`icon.svg` mangler en route i `vercel.json`** — `index.html` refererer til den, men catch-all-routen sender den til `index.html`.
