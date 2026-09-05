@@ -1089,7 +1089,7 @@ en:{
   storage_failed:"Could not save — this device's storage is full. Free up space, or your changes will be lost when you reload.",
   close:"Close",
   // plan view
-  back_plans:"← Plans", tab_today:"Today", tab_plan:"Plan", tab_stats:"Stats",
+  back_plans:"← Plans", tab_today:"Calendar", tab_plan:"Plan", tab_stats:"Stats",
   rest_day:"Rest day", no_session:"No session", rest_is_part:"Recovery is part of the plan.",
   free_day:"Free day — no session planned.", plan_not_started:"The plan hasn't started yet.",
   completed:"✓ Completed", move_session:"Move session", undo:"Undo", log_session:"Log session →",
@@ -1238,7 +1238,7 @@ da:{
   replan_failed:"Kunne ikke justere planen. Din plan er uændret — prøv igen senere.",
   storage_failed:"Kunne ikke gemme — enhedens lager er fuldt. Frigør plads, ellers går dine ændringer tabt når du genindlæser.",
   close:"Luk",
-  back_plans:"← Planer", tab_today:"I dag", tab_plan:"Plan", tab_stats:"Tal",
+  back_plans:"← Planer", tab_today:"Kalender", tab_plan:"Plan", tab_stats:"Tal",
   rest_day:"Hviledag", no_session:"Ingen session", rest_is_part:"Restitution er en del af planen.",
   free_day:"Fri dag — ingen træning planlagt.", plan_not_started:"Planen starter ikke i dag.",
   completed:"✓ Gennemført", move_session:"Flyt træning", undo:"Fortryd", log_session:"Log session →",
@@ -1618,6 +1618,27 @@ function planToShareable(plan){
     weeksAvailable:plan.weeksAvailable,sessionsPerWeek:plan.sessionsPerWeek,
     startDate:plan.startDate,raceDate:plan.raceDate||null,
     generatedBy:plan.generatedBy||null,weeks:plan.weeks};
+}
+
+// undefined = not computed yet, null = too long to share, string = ready.
+// Precomputed when the plan tab renders so the click handler never has to await
+// before reaching the clipboard.
+let shareUrl;
+
+// navigator.clipboard is not always reachable — an insecure origin, a browser
+// that revoked the gesture, a locked-down webview. execCommand is deprecated
+// but still the widest-reaching synchronous copy.
+function legacyCopy(text){
+  try{
+    const ta=document.createElement("textarea");
+    ta.value=text;ta.setAttribute("readonly","");
+    ta.style.position="fixed";ta.style.top="-1000px";ta.style.opacity="0";
+    document.body.appendChild(ta);
+    ta.select();ta.setSelectionRange(0,text.length);
+    const ok=document.execCommand("copy");
+    ta.remove();
+    return ok;
+  }catch(e){return false;}
 }
 
 async function buildShareUrl(plan){
@@ -2435,7 +2456,21 @@ function renderTabToday(plan,c){
       </div>
     </div>`;
   }
-  c.innerHTML=`${cardHtml}${extrasForSelHtml?`<div style="margin-top:0;">${extrasForSelHtml}</div>`:""}${guideHtml}${nextHtml}${ringHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 24px 0;"><button id="stripPrevBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">‹</button><span style="font-family:'Turret Road',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);">${weekLabel}</span><button id="stripNextBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">›</button></div><div class="week-strip" style="margin-top:8px;">${stripHtml}</div><div class="add-extra-wrap"><button class="btn btn-outline" id="addExtraBtn" style="width:100%;font-size:12px;padding:10px;">${t("add_extra")}</button><div id="addExtraForm" style="display:none;margin-top:12px;"></div></div><div style="height:32px;"></div>`;
+  c.innerHTML=`${cardHtml}${extrasForSelHtml?`<div style="margin-top:0;">${extrasForSelHtml}</div>`:""}${guideHtml}${nextHtml}${ringHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 24px 0;"><button id="stripPrevBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">‹</button><span style="font-family:'Turret Road',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);">${weekLabel}</span><button id="stripNextBtn" class="btn btn-outline" style="font-size:16px;padding:4px 12px;min-height:32px;line-height:1;">›</button></div><div class="week-strip" style="margin-top:8px;">${stripHtml}</div><div class="add-extra-wrap"><button class="btn btn-outline" id="addExtraBtn" style="width:100%;font-size:12px;padding:10px;">${t("add_extra")}</button><div id="addExtraForm" style="display:none;margin-top:12px;"></div></div>
+  <div class="import-box">
+    <h3>${t("import_title")}</h3>
+    <p class="import-desc">${t("import_body")}</p>
+    <div id="importArea"><div class="upload-area" id="uploadDropzone">
+      <label class="upload-label" for="screenshotInput">${t("choose_image")}</label>
+      <input type="file" id="screenshotInput" accept="image/*" style="display:none;">
+      <div class="upload-hint">${t("import_formats")}</div>
+    </div></div>
+  </div>
+  <div style="height:32px;"></div>`;
+
+  // Moved here with the markup it drives. Dropping this call is exactly
+  // how the import box went unreachable once before.
+  wireUploadArea();
 
   // Wire log button
   if(ts){
@@ -2653,36 +2688,33 @@ function renderTabPlan(plan,c){
       </div>
     </details>
   </div>
+  <div class="phases-wrap">${phasesHtml}</div>
   <div class="share-row">
     <button class="btn btn-outline" id="sharePlanBtn">${t("share_plan")}</button>
     <div class="share-hint" id="shareHint"></div>
   </div>
-  <div class="import-box">
-    <h3>${t("import_title")}</h3>
-    <p class="import-desc">${t("import_body")}</p>
-    <div id="importArea"><div class="upload-area" id="uploadDropzone">
-      <label class="upload-label" for="screenshotInput">${t("choose_image")}</label>
-      <input type="file" id="screenshotInput" accept="image/*" style="display:none;">
-      <div class="upload-hint">${t("import_formats")}</div>
-    </div></div>
-  </div>
-  <div class="phases-wrap">${phasesHtml}</div>`;
+`;
+
+  // Build the link now, not on click. writeText() needs the click to still count
+  // as user activation, and awaiting the gzip spends it — which is why the copy
+  // was quietly failing and always dropping to the manual field.
+  shareUrl=undefined;
+  buildShareUrl(plan).then(u=>{shareUrl=u;}).catch(()=>{shareUrl=null;});
 
   const shareBtn=document.getElementById("sharePlanBtn");
   if(shareBtn)shareBtn.onclick=async()=>{
     const hint=document.getElementById("shareHint");
-    const url=await buildShareUrl(plan);
+    const url=shareUrl!==undefined?shareUrl:await buildShareUrl(plan);
     if(!url){hint.textContent=t("share_too_long");return;}
-    try{await navigator.clipboard.writeText(url);hint.textContent=t("share_copied");}
-    catch(e){
-      // Clipboard is blocked in some contexts — show the link so it can still
-      // be copied by hand rather than failing silently.
-      hint.innerHTML=`<div>${t("share_copy_manually")}</div><input class="share-url" readonly value="${url.replace(/"/g,"&quot;")}">`;
-      const inp=hint.querySelector("input");inp.focus();inp.select();
-    }
+    let copied=false;
+    try{await navigator.clipboard.writeText(url);copied=true;}catch(e){}
+    if(!copied)copied=legacyCopy(url);
+    if(copied){hint.textContent=t("share_copied");return;}
+    // Last resort: show the link so it can still be copied by hand.
+    hint.innerHTML=`<div>${t("share_copy_manually")}</div><input class="share-url" readonly value="${url.replace(/"/g,"&quot;")}">`;
+    const inp=hint.querySelector("input");inp.focus();inp.select();
   };
 
-  wireUploadArea();
 
   // Phase toggle
   c.querySelectorAll(".phase-head[data-phase]").forEach(head=>{

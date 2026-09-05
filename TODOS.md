@@ -130,6 +130,11 @@ Appen var halvt engelsk (landingsside, wizard) og halvt dansk (planvisning, coac
 
 ---
 
+### UI-omrokering 2026-09-05
+- [x] **"I dag" hedder nu "Kalender"** — fanen viser en uge ad gangen med navigation frem og tilbage, ikke kun i dag.
+- [x] **Screenshot-import flyttet fra PLAN til Kalender.** Den hører sammen med at logge hvad man har lavet — ekstra træninger og ugestripen — ikke med at læse planen. `wireUploadArea()` flyttede med markup'en; det er præcis dét kald der før blev efterladt og gjorde `api/scan.js` uopnåelig fra UI'et.
+- [x] **"Del denne plan" flyttet ned under faserne.** Den lå over selve planen, side om side med screenshot-importen som den intet har med at gøre. Man deler en plan efter man har set på den.
+
 ## 🔵 Backlog (defer til brugerfeedback)
 
 - [x] **Del plan som URL** — DONE 2026-09-05. "Del denne plan" nederst i PLAN-fanen laver et link og kopierer det. Modtageren får et gult kort øverst: "En plan er delt med dig" med planens navn, længde og sessioner/uge, og kan importere eller afvise.
@@ -137,6 +142,8 @@ Appen var halvt engelsk (landingsside, wizard) og halvt dansk (planvisning, coac
   **Gzip før base64.** En 12-ugers plan er 4113 tegn JSON = 5484 tegn rå base64, hvilket er for langt til et link folk rent faktisk sætter ind. Gzip'et bliver det **2125 tegn** — 62% kortere. Første tegn i parameteren siger hvilken kodning der blev brugt (`z` eller `r`), så en browser uden `CompressionStream` stadig laver et link enhver browser kan læse.
 
   **Fremdrift følger ikke med.** Modtageren vil have planen, ikke en optegnelse over hvilke sessioner en anden har krydset af. Importerede planer får nyt id, tom fremdrift og `importedFromShare`.
+
+  **Clipboard-fejlen (rettet 2026-09-05):** første version byggede linket inde i klik-handleren. `navigator.clipboard.writeText()` kræver at klikket stadig tæller som brugerhandling, og det at vente på gzip-komprimeringen brugte den op — så kopieringen fejlede altid og faldt tilbage til det manuelle felt. Linket forudberegnes nu når PLAN-fanen renderes, så klikket kan kopiere synkront. `execCommand` er andet fald-tilbage, det manuelle felt det tredje.
 
   URL-parameteren ryddes efter import eller afvisning, så en genindlæsning ikke tilbyder det samme igen. Clipboard-fejl falder tilbage til at vise linket i et markerbart felt med en label — det er den vej der reelt bliver testet, da headless-browseren blokerer clipboard.
 
