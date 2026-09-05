@@ -132,7 +132,15 @@ Appen var halvt engelsk (landingsside, wizard) og halvt dansk (planvisning, coac
 
 ## 🔵 Backlog (defer til brugerfeedback)
 
-- [ ] **Del plan som URL** — base64-encode planstate → querystring → delbar link
+- [x] **Del plan som URL** — DONE 2026-09-05. "Del denne plan" nederst i PLAN-fanen laver et link og kopierer det. Modtageren får et gult kort øverst: "En plan er delt med dig" med planens navn, længde og sessioner/uge, og kan importere eller afvise.
+
+  **Gzip før base64.** En 12-ugers plan er 4113 tegn JSON = 5484 tegn rå base64, hvilket er for langt til et link folk rent faktisk sætter ind. Gzip'et bliver det **2125 tegn** — 62% kortere. Første tegn i parameteren siger hvilken kodning der blev brugt (`z` eller `r`), så en browser uden `CompressionStream` stadig laver et link enhver browser kan læse.
+
+  **Fremdrift følger ikke med.** Modtageren vil have planen, ikke en optegnelse over hvilke sessioner en anden har krydset af. Importerede planer får nyt id, tom fremdrift og `importedFromShare`.
+
+  URL-parameteren ryddes efter import eller afvisning, så en genindlæsning ikke tilbyder det samme igen. Clipboard-fejl falder tilbage til at vise linket i et markerbart felt med en label — det er den vej der reelt bliver testet, da headless-browseren blokerer clipboard.
+
+  **Ikke testet:** længdegrænsen på 8000 tegn er kun ramt af syntetiske planer, som gzip komprimerer urealistisk godt. En rigtig 24-ugers plan bør måles.
 - [ ] **iCal-eksport** — .ics-fil download fra PLAN-tabben
 - [ ] **Ugentlig coaching-email** — Resend + Supabase Edge Function cron
 - [ ] **Strava-integration** — kræver OAuth-review-proces, uger ventetid

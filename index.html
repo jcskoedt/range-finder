@@ -653,6 +653,21 @@ body{
 .item-label{font-size:14px;font-weight:600;}
 .item-label.checked{color:var(--subtle);text-decoration:line-through;}
 #app{padding-bottom:72px;}
+.share-row{padding:0 24px 20px;}
+.share-row .btn{font-size:12px;padding:10px 18px;}
+.share-hint{font-size:11px;color:var(--subtle);margin-top:8px;line-height:1.45;}
+.share-url{
+  width:100%;font-family:'Inter',sans-serif;font-size:11px;padding:8px;
+  border:2px solid var(--border);background:transparent;box-sizing:border-box;
+}
+.shared-card{
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+  padding:14px 24px;border-bottom:2px solid var(--border);background:var(--yellow);
+}
+.shared-title{font-size:13px;font-weight:700;}
+.shared-body{font-size:12px;margin-top:2px;}
+.shared-actions{display:flex;gap:8px;}
+.shared-actions .btn{font-size:11px;padding:8px 14px;min-height:34px;}
 .replan-card{
   display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
   padding:14px 24px;border-bottom:2px solid var(--border);background:var(--yellow);
@@ -1060,6 +1075,10 @@ en:{
   notice_ratelimit:"You've made a lot of plans in a short time. This one uses our own algorithm.",
   notice_too_large:"A plan that long is better handled by our own algorithm than by the AI coach — so that is what this one is.",
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
+  share_plan:"Share this plan", share_copied:"Link copied — paste it wherever you like.",
+  share_too_long:"This plan is too long to share as a link.",
+  share_copy_manually:"Copy the link from here:",
+  shared_title:"A plan was shared with you", shared_import:"Import it", shared_dismiss:"No thanks",
   replan_title_one:"You skipped a week", replan_title_many:"You skipped {n} weeks",
   replan_body_one:"Shall the AI coach adjust the one week you have left?",
   replan_body_many:"Shall the AI coach adjust the {n} weeks you have left?",
@@ -1206,6 +1225,10 @@ da:{
   notice_ratelimit:"Du har lavet mange planer på kort tid. Denne er lavet med vores egen algoritme.",
   notice_too_large:"Så lang en plan laver vores egen algoritme bedre end AI-coachen — så det er den, du får her.",
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
+  share_plan:"Del denne plan", share_copied:"Link kopieret — sæt det ind hvor du vil.",
+  share_too_long:"Denne plan er for lang til at deles som link.",
+  share_copy_manually:"Kopiér linket herfra:",
+  shared_title:"En plan er delt med dig", shared_import:"Importér den", shared_dismiss:"Nej tak",
   replan_title_one:"Du har sprunget en uge over", replan_title_many:"Du har sprunget {n} uger over",
   replan_body_one:"Skal AI-coachen justere den ene uge, du har tilbage?",
   replan_body_many:"Skal AI-coachen justere de {n} uger, du har tilbage?",
@@ -1560,6 +1583,74 @@ async function runReplan(plan,sw){
   }
 }
 
+/* ---------------- SHARE A PLAN AS A URL ---------------- */
+// A plan is ~4KB of JSON, which is 5.5KB of base64 — too long for a link people
+// will actually paste. Gzipping first gets it to ~2KB. The first character says
+// which encoding was used, so a browser without CompressionStream still
+// produces a link that any browser can read.
+const SHARE_PARAM="p";
+const SHARE_MAX_URL=8000;
+
+function bytesToB64url(bytes){
+  let bin="";
+  for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function b64urlToBytes(str){
+  const bin=atob(str.replace(/-/g,"+").replace(/_/g,"/"));
+  const out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
+  return out;
+}
+async function gzip(bytes){
+  const stream=new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function gunzip(bytes){
+  const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+// Progress is deliberately left out: the recipient wants the plan, not a record
+// of which sessions someone else ticked off.
+function planToShareable(plan){
+  return{v:1,sport:plan.sport,label:plan.label,target:plan.target,
+    weeksAvailable:plan.weeksAvailable,sessionsPerWeek:plan.sessionsPerWeek,
+    startDate:plan.startDate,raceDate:plan.raceDate||null,
+    generatedBy:plan.generatedBy||null,weeks:plan.weeks};
+}
+
+async function buildShareUrl(plan){
+  const json=JSON.stringify(planToShareable(plan));
+  const raw=new TextEncoder().encode(json);
+  let payload,marker;
+  try{payload=await gzip(raw);marker="z";}
+  catch(e){payload=raw;marker="r";}
+  const url=location.origin+location.pathname+"?"+SHARE_PARAM+"="+marker+bytesToB64url(payload);
+  return url.length>SHARE_MAX_URL?null:url;
+}
+
+function clearShareParam(){
+  try{
+    const u=new URL(location.href);
+    u.searchParams.delete(SHARE_PARAM);
+    history.replaceState(null,"",u.pathname+(u.search||"")+u.hash);
+  }catch(e){}
+}
+
+async function readSharedPlan(){
+  let param=null;
+  try{param=new URLSearchParams(location.search).get(SHARE_PARAM);}catch(e){}
+  if(!param||param.length<2)return null;
+  try{
+    const bytes=b64urlToBytes(param.slice(1));
+    const raw=param[0]==="z"?await gunzip(bytes):bytes;
+    const data=JSON.parse(new TextDecoder().decode(raw));
+    if(data&&data.v===1&&SPORTS[data.sport]&&Array.isArray(data.weeks)&&data.weeks.length)return data;
+  }catch(e){console.warn("[share] could not read link:",e);}
+  return null;
+}
+
 /* ---------------- AI PLAN MAPPING ---------------- */
 // The app stores sport as ASCII keys (cykling/lob/svomning) — they double as
 // object keys and DOM data attributes. /api/generate accepts those keys but
@@ -1669,6 +1760,7 @@ function isFuture(d){
 }
 
 /* ---------------- STATE ---------------- */
+let sharedPlan=null; // a plan decoded from ?p= on this page load
 let state={view:"library",planIndex:[],activePlan:null,wizardSport:"cykling",wizardFitness:"Motionist",wizardRaceDate:"",planCache:{}};
 const app=document.getElementById("app");
 
@@ -1714,6 +1806,17 @@ function renderLibrary(loading){
       <p class="proof-text">${t("proof_text")}</p>
     </div>
   `;
+
+  const sharedHtml=sharedPlan?`<div class="shared-card" id="sharedCard">
+      <div>
+        <div class="shared-title">${t("shared_title")}</div>
+        <div class="shared-body">${sharedPlan.label} · ${t("card_meta",{w:sharedPlan.weeks.length,s:sharedPlan.sessionsPerWeek,d:sharedPlan.startDate||""})}</div>
+      </div>
+      <div class="shared-actions">
+        <button class="btn" id="sharedImport">${t("shared_import")}</button>
+        <button class="btn btn-outline" id="sharedDismiss">${t("shared_dismiss")}</button>
+      </div>
+    </div>`:"";
 
   let plansHtml="";
   if(loading){
@@ -1783,7 +1886,28 @@ function renderLibrary(loading){
     </details>
   `;
 
-  app.innerHTML=heroHtml+plansHtml+howHtml;
+  app.innerHTML=sharedHtml+heroHtml+plansHtml+howHtml;
+
+  const sd=document.getElementById("sharedDismiss");
+  if(sd)sd.onclick=()=>{sharedPlan=null;clearShareParam();render();};
+  const si=document.getElementById("sharedImport");
+  if(si)si.onclick=async()=>{
+    si.disabled=true;
+    const src=sharedPlan;
+    // A fresh id and empty progress: an imported plan is the recipient's own
+    // from here, not a copy of someone else's log.
+    const plan={id:"p"+Date.now(),sport:src.sport,label:src.label,target:src.target,
+      weeksAvailable:src.weeks.length,sessionsPerWeek:src.sessionsPerWeek,
+      startDate:src.startDate||new Date().toISOString().slice(0,10),
+      raceDate:src.raceDate||null,createdAt:new Date().toISOString().slice(0,10),
+      generatedBy:src.generatedBy||null,importedFromShare:true,weeks:src.weeks,progress:{}};
+    await savePlan(plan);
+    state.planCache[plan.id]=plan;
+    state.planIndex.push({id:plan.id,sport:plan.sport,label:plan.label,weeksAvailable:plan.weeksAvailable,sessionsPerWeek:plan.sessionsPerWeek,createdAt:plan.createdAt});
+    await saveIndex(state.planIndex);
+    sharedPlan=null;clearShareParam();
+    state.activePlan=plan;openWeekIdx=null;planTab="today";state.view="plan";render();
+  };
 
   document.getElementById("newPlanBtn").onclick=()=>{state.view="wizard";render();};
   const heroVideo=document.getElementById("heroVideo");
@@ -2529,6 +2653,10 @@ function renderTabPlan(plan,c){
       </div>
     </details>
   </div>
+  <div class="share-row">
+    <button class="btn btn-outline" id="sharePlanBtn">${t("share_plan")}</button>
+    <div class="share-hint" id="shareHint"></div>
+  </div>
   <div class="import-box">
     <h3>${t("import_title")}</h3>
     <p class="import-desc">${t("import_body")}</p>
@@ -2539,6 +2667,20 @@ function renderTabPlan(plan,c){
     </div></div>
   </div>
   <div class="phases-wrap">${phasesHtml}</div>`;
+
+  const shareBtn=document.getElementById("sharePlanBtn");
+  if(shareBtn)shareBtn.onclick=async()=>{
+    const hint=document.getElementById("shareHint");
+    const url=await buildShareUrl(plan);
+    if(!url){hint.textContent=t("share_too_long");return;}
+    try{await navigator.clipboard.writeText(url);hint.textContent=t("share_copied");}
+    catch(e){
+      // Clipboard is blocked in some contexts — show the link so it can still
+      // be copied by hand rather than failing silently.
+      hint.innerHTML=`<div>${t("share_copy_manually")}</div><input class="share-url" readonly value="${url.replace(/"/g,"&quot;")}">`;
+      const inp=hint.querySelector("input");inp.focus();inp.select();
+    }
+  };
 
   wireUploadArea();
 
@@ -2747,6 +2889,7 @@ function render(){
   syncLangToggle();
   document.documentElement.lang=lang;
   renderLibrary(true);
+  sharedPlan=await readSharedPlan();
   state.planIndex=await loadIndex();
   if(state.view==="library")renderLibrary(false);
 })();
