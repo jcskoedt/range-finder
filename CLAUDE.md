@@ -18,3 +18,12 @@ Key routing rules:
 - Save progress → invoke /context-save
 - Resume context → invoke /context-restore
 - Author a backlog-ready spec/issue → invoke /spec
+
+## Git og deploy — vigtigt
+
+**Alt laves lokalt først. Der pushes og deployes KUN når Jacob eksplicit siger til.**
+
+- Commit lokalt er fint uden at spørge — det er reversibelt og holder arbejdet samlet.
+- `git push` kræver at Jacob siger det. Ikke "skal jeg pushe?" efterfulgt af antaget ja — han skal sige det.
+- `vercel --prod` og `vercel alias set` kræver det samme. De er udadvendte og ændrer hvad brugere ser.
+- Rapportér altid hvad der ligger ucommittet/upushet, så han kan beslutte.

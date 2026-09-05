@@ -32,7 +32,8 @@ B1 er live og verificeret i produktion: wizarden kalder `/api/generate`, får ri
 
 ## Live app
 **URL:** `https://rangefinderapp.vercel.app`
-**Repo:** `jcskoedt/range-finder` (branch: `main`, alt arbejde pushes direkte, ingen feature branches brugt)
+**Repo:** `jcskoedt/range-finder` (branch: `main`)
+**Arbejdsgang:** alt laves og committes lokalt først. Der pushes og deployes **kun** når Jacob eksplicit siger til — se CLAUDE.md. (Denne linje sagde tidligere "alt arbejde pushes direkte", hvilket var forkert.)
 **Vercel-projekt:** `rangefinderapp` (team: `range-finder`)
 
 **Navnehistorik (vigtig hvis noget ser forkert ud):** Projektet hed oprindeligt `traeningsplan-app`. Omdøbt 2026-09-04 → `range-finder` (taget af en anden bruger) → endte på `rangefinderapp`. Den gamle URL `traeningsplan-app.vercel.app` virker muligvis stadig midlertidigt som alias, men skal ikke bruges fremadrettet. `rangefinderapp.vercel.app` er en **manuel alias** (`vercel alias set`) — den følger IKKE automatisk nye deploys. Efter hver git push, tjek at aliaset peger på den nyeste deployment:
