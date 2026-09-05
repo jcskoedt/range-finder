@@ -351,3 +351,20 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "generation_failed" });
   }
 }
+
+// Exported for scripts/validate-generate.mjs so the validator exercises this
+// exact code rather than a copy that can drift. Vercel only uses the default
+// export above.
+export {
+  MODEL,
+  MAX_TOKENS,
+  MAX_WEEKS,
+  PEAK_FRACTION,
+  FITNESS_SESSIONS,
+  SPORT_ALIASES,
+  SYSTEM,
+  allocatePhases,
+  buildUserMessage,
+  extractJson,
+  validatePlan,
+};

@@ -6,7 +6,10 @@ Sidst opdateret: 2026-09-04
 ## 🔴 Gør nu
 
 - [x] **BLOKERENDE: Ret ANTHROPIC_API_KEY** — LØST 2026-09-05. `ANTHROPIC_WORKSPACE_ID` sat i Vercel (Production), `api/scan.js` fik samme header. Verificeret med tre ægte kald i produktion mod dansk, engelsk og alle tre sportsgrene — se HANDOFF.md.
-- [ ] **Kør prompt-valideringen igen** — de 93% gælder en prompt der siden er ændret to gange (måldistance tilføjet, engelsk variant tilføjet). Tre stikprøver i produktion så rigtige ud, men det er ikke en måling.
+- [x] **Prompt-validering kørt igen** — 2026-09-05, efter måldistance + engelsk variant. **15/16 gyldige (94%)**, 14/16 i første forsøg. Ingen regression fra de 93% før ændringerne. Kør igen med `node scripts/validate-generate.mjs`.
+- [x] **`scripts/validate-generate.mjs` skrevet** — den udskudte opgave fra eng-review. Kalder Anthropic direkte med endpointets egne funktioner (importeret, ikke kopieret), så rate limiten ikke er i vejen. 16 samples på tværs af sportsgrene, niveauer, planlængder og begge sprog. Exit-kode 0/1, så den kan bruges som gate.
+- [ ] **Lange planer taber en uge.** Begge kørsler fejlede på den længste/tætteste plan — 20u×5 og 24u×6 sessioner. Fejlen er ikke trunkering (`stop_reason: end_turn`), modellen returnerer bare 23 uger i stedet for 24. Retry hjælper ikke. Appen falder tilbage til algoritmen, så brugeren får en plan, men ikke en AI-plan. **Overvej at cappe AI-planer ved ~16-20 uger** og lade algoritmen tage de længste. Bekræfter den gamle bekymring om lange planer, men årsagen er optælling, ikke max_tokens.
+- [ ] **Måldistance-heuristikken rammer 12/13** (ekskl. 1-ugers planer, hvor der ikke er nogen opbygning at måle). Ratio længste træning / forventet 80%: mest 1,0, med enkelte på 0,63-0,75 og én på 1,25. God nok, men ikke præcis.
 - [ ] **Automatisér aliaset** — `rangefinderapp.vercel.app` skal sættes manuelt efter hvert deploy og har nu tre gange peget på gammel kode. Overvej at gøre `rangefinderapp` til produktionsdomænet i projektindstillingerne i stedet for et manuelt alias.
 - [ ] **`icon.svg` mangler en route i `vercel.json`** — `index.html` refererer til den, men catch-all-routen sender den til `index.html`.
 
