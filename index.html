@@ -653,6 +653,14 @@ body{
 .item-label{font-size:14px;font-weight:600;}
 .item-label.checked{color:var(--subtle);text-decoration:line-through;}
 #app{padding-bottom:72px;}
+.replan-card{
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+  padding:14px 24px;border-bottom:2px solid var(--border);background:var(--yellow);
+}
+.replan-title{font-size:13px;font-weight:700;}
+.replan-body{font-size:12px;margin-top:2px;}
+.replan-actions{display:flex;gap:8px;}
+.replan-actions .btn{font-size:11px;padding:8px 14px;min-height:34px;}
 .storage-warning{
   position:fixed;left:12px;right:12px;bottom:64px;z-index:60;
   display:flex;gap:12px;align-items:flex-start;
@@ -1052,6 +1060,13 @@ en:{
   notice_ratelimit:"You've made a lot of plans in a short time. This one uses our own algorithm.",
   notice_too_large:"A plan that long is better handled by our own algorithm than by the AI coach — so that is what this one is.",
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
+  replan_title_one:"You skipped a week", replan_title_many:"You skipped {n} weeks",
+  replan_body_one:"Shall the AI coach adjust the one week you have left?",
+  replan_body_many:"Shall the AI coach adjust the {n} weeks you have left?",
+  replan_yes:"Adjust the plan", replan_no:"No thanks", replan_working:"Adjusting…",
+  replan_done_one:"Plan adjusted — the remaining week was rewritten around the break.",
+  replan_done_many:"Plan adjusted — the {n} remaining weeks were rewritten around the break.",
+  replan_failed:"Could not adjust the plan. Your plan is unchanged — try again later.",
   storage_failed:"Could not save — this device's storage is full. Free up space, or your changes will be lost when you reload.",
   close:"Close",
   // plan view
@@ -1191,6 +1206,13 @@ da:{
   notice_ratelimit:"Du har lavet mange planer på kort tid. Denne er lavet med vores egen algoritme.",
   notice_too_large:"Så lang en plan laver vores egen algoritme bedre end AI-coachen — så det er den, du får her.",
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
+  replan_title_one:"Du har sprunget en uge over", replan_title_many:"Du har sprunget {n} uger over",
+  replan_body_one:"Skal AI-coachen justere den ene uge, du har tilbage?",
+  replan_body_many:"Skal AI-coachen justere de {n} uger, du har tilbage?",
+  replan_yes:"Juster planen", replan_no:"Nej tak", replan_working:"Justerer…",
+  replan_done_one:"Planen er justeret — den resterende uge er skrevet om efter pausen.",
+  replan_done_many:"Planen er justeret — de {n} resterende uger er skrevet om efter pausen.",
+  replan_failed:"Kunne ikke justere planen. Din plan er uændret — prøv igen senere.",
   storage_failed:"Kunne ikke gemme — enhedens lager er fuldt. Frigør plads, ellers går dine ændringer tabt når du genindlæser.",
   close:"Luk",
   back_plans:"← Planer", tab_today:"I dag", tab_plan:"Plan", tab_stats:"Tal",
@@ -1482,6 +1504,60 @@ function weeksUntil(dateStr){
   if(d<=today)return 0;
   const days=Math.round((d-today)/86400000);
   return Math.ceil(days/7);
+}
+
+// Sends the weeks that are still ahead to /api/replan and writes the adjusted
+// sessions back in place. The phases come back unchanged by contract, so only
+// items are replaced — week count, dates and progress keys all stay put.
+async function runReplan(plan,sw){
+  const remaining=sw.remaining.map(i=>({phase:plan.weeks[i].phase,items:plan.weeks[i].items}));
+  try{
+    const ctrl=new AbortController();
+    const abortTimer=setTimeout(()=>ctrl.abort(),AI_GENERATE_TIMEOUT_MS);
+    let res;
+    try{
+      res=await fetch("/api/replan",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          plan_id:plan.id,
+          sport:plan.sport,
+          fitness_level:state.wizardFitness,
+          target_km:plan.target,
+          sessions_per_week:plan.sessionsPerWeek,
+          goal_event:plan.target+" km "+t("goal_"+plan.sport),
+          language:lang,
+          skipped_week_indices:sw.skipped,
+          remaining_weeks:remaining,
+        }),
+        signal:ctrl.signal,
+      });
+    }finally{clearTimeout(abortTimer);}
+    if(!res.ok){
+      let err=null;try{err=await res.json();}catch(e){}
+      console.warn("[replan] HTTP "+res.status+" "+((err&&err.error)||""));
+      planNotice=res.status===429?t("notice_ratelimit"):t("replan_failed");
+      render();
+      return false;
+    }
+    const out=await res.json();
+    sw.remaining.forEach((wIdx,k)=>{
+      if(out.weeks[k])plan.weeks[wIdx].items=out.weeks[k].items;
+    });
+    plan.replanDismissed=sw.skipped.length;
+    plan.replannedAt=new Date().toISOString().slice(0,10);
+    await savePlan(plan);
+    state.planCache[plan.id]=plan;
+    planNotice=out.weeks.length===1?t("replan_done_one"):t("replan_done_many",{n:out.weeks.length});
+    openWeekIdx=null;
+    render();
+    return true;
+  }catch(e){
+    console.warn("[replan] "+(e&&e.name==="AbortError"?"timed out":e));
+    planNotice=t("replan_failed");
+    render();
+    return false;
+  }
 }
 
 /* ---------------- AI PLAN MAPPING ---------------- */
@@ -1973,6 +2049,27 @@ function weekProgress(plan,wkStart){
   return{planned,logged};
 }
 
+// A week counts as skipped when its last session date has passed and nothing in
+// it was ticked off. Weeks that are not fully past are what a replan rewrites —
+// the skipped ones stay in place as history so the progress keys (wIdx_sIdx)
+// and the session dates around them do not shift.
+function skippedWeekInfo(plan){
+  const today=new Date();today.setHours(0,0,0,0);
+  const skipped=[],remaining=[];
+  plan.weeks.forEach((w,wIdx)=>{
+    let last=null,anyDone=false;
+    w.items.forEach((item,i)=>{
+      const sd=getSessionDate(plan,wIdx,i);
+      if(sd){const d=new Date(sd);d.setHours(0,0,0,0);if(!last||d>last)last=d;}
+      const pr=plan.progress[keyFor(wIdx,i)];
+      if(pr&&pr.done)anyDone=true;
+    });
+    if(last&&last<today){if(!anyDone)skipped.push(wIdx);}
+    else remaining.push(wIdx);
+  });
+  return{skipped,remaining};
+}
+
 function computeStats(plan){
   let ds=0,ts=0,dk=0,tk=0;
   plan.weeks.forEach((w,wIdx)=>{w.items.forEach((item,i)=>{ts++;tk+=item[1];const p=plan.progress[keyFor(wIdx,i)];if(p&&p.done){ds++;dk+=(p.actualKm!=null&&p.actualKm!=="")?Number(p.actualKm):item[1];}});});
@@ -1995,6 +2092,21 @@ function renderPlanView(){
   const sport=SPORTS[plan.sport];
   if(openWeekIdx===null){const s=computeStats(plan);openWeekIdx=s.activeWeek-1;}
 
+  // Offer a replan once weeks have gone by untouched. Re-asks only if more
+  // weeks are skipped after a dismissal, so it cannot nag.
+  const sw=skippedWeekInfo(plan);
+  const askReplan=sw.skipped.length>0&&sw.remaining.length>0&&sw.skipped.length>(plan.replanDismissed||0);
+  const replanHtml=askReplan?`<div class="replan-card" id="replanCard">
+      <div class="replan-text">
+        <div class="replan-title">${sw.skipped.length===1?t("replan_title_one"):t("replan_title_many",{n:sw.skipped.length})}</div>
+        <div class="replan-body">${sw.remaining.length===1?t("replan_body_one"):t("replan_body_many",{n:sw.remaining.length})}</div>
+      </div>
+      <div class="replan-actions">
+        <button class="btn" id="replanYes">${t("replan_yes")}</button>
+        <button class="btn btn-outline" id="replanNo">${t("replan_no")}</button>
+      </div>
+    </div>`:"";
+
   app.innerHTML=`
     <div class="page-header">
       <div class="page-header-left">
@@ -2004,6 +2116,7 @@ function renderPlanView(){
       <button class="backlink" id="backLib">${t("back_plans")}</button>
     </div>
     ${planNotice?`<div class="plan-notice" id="planNotice"><div>${planNotice}</div><button class="plan-notice-close" id="planNoticeClose" aria-label="${t("close")}">✕</button></div>`:""}
+    ${replanHtml}
     <div class="plan-tabs">
       <button class="plan-tab ${planTab==="today"?"active":""}" data-tab="today">${t("tab_today")}</button>
       <button class="plan-tab ${planTab==="plan"?"active":""}" data-tab="plan">${t("tab_plan")}</button>
@@ -2016,6 +2129,20 @@ function renderPlanView(){
   planNotice=null;
   const noticeClose=document.getElementById("planNoticeClose");
   if(noticeClose)noticeClose.onclick=()=>{const b=document.getElementById("planNotice");if(b)b.remove();};
+
+  const replanNo=document.getElementById("replanNo");
+  if(replanNo)replanNo.onclick=async()=>{
+    plan.replanDismissed=sw.skipped.length;
+    await savePlan(plan);
+    render();
+  };
+  const replanYes=document.getElementById("replanYes");
+  if(replanYes)replanYes.onclick=async()=>{
+    const btn=replanYes;
+    btn.disabled=true;btn.textContent=t("replan_working");
+    const ok=await runReplan(plan,sw);
+    if(!ok){btn.disabled=false;btn.textContent=t("replan_yes");}
+  };
 
   document.getElementById("backLib").onclick=()=>{openWeekIdx=null;openPhaseKey=null;planTab="today";state.view="library";render();};
   document.querySelectorAll(".plan-tab").forEach(btn=>{

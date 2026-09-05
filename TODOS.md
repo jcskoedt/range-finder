@@ -106,7 +106,16 @@ Appen var halvt engelsk (landingsside, wizard) og halvt dansk (planvisning, coac
 
 ## 🟡 Byg efter B1 er valideret — B2
 
-- [ ] `api/replan.js` — Modtager skippede uger + resterende plan → Claude justerer faser og km
+- [x] **`api/replan.js`** — DONE 2026-09-05. Deler konstanter og helpers med `generate.js` via import, ikke kopi. Arver alt fra B1: sport-aliaser, sprogvariant, sessions-cap, rate limit, 16000 max_tokens, ét retry.
+
+  **To bevidste afvigelser fra CEO-specen**, begge samme lektie som B1 lærte os:
+  1. **Faserne er låst.** Specen tillod modellen at omdøbe faser ("forkorte PEAK og forlænge TAPER"). Faserne blev deterministisk allokeret i B1 netop for at undgå at modellen roder med struktur — at lade den skrive dem om her ville genindføre driften. Serveren sender den præcise faseliste og validerer at den kommer uændret tilbage.
+  2. **Planen beholder sin længde.** Specen tillod at tilføje en restitutionsuge ved >2 sprungne uger. Men hvis løbsdatoen er fast, kan man ikke forlænge planen — løbet flytter sig ikke. I stedet markeres første resterende uge som en bevidst tilbagevenden (`ease_in`), som modellen så skruer ned. Samme effekt, uden at måldatoen skrider.
+
+  **Testet mod den ægte API:** 3 uger sprunget over, 9 tilbage → 9 uger ud, faser identiske, uge 1 skruet 27% ned med noter der forklarer hvorfor ("Reduceret efter 3 ugers pause - prioriterer sikker genopstart"), måldistancen stadig i sidste uge. 12,4 sek. Plus 13 valideringsveje og cappen.
+- [x] **UI: "Vil du justere din plan?"** — DONE 2026-09-05. `skippedWeekInfo()` finder uger hvis sidste sessionsdato er passeret uden at noget er krydset af. Gult banner øverst på planen med "Juster planen" / "Nej tak". Sprungne uger bliver liggende som historik, så progress-nøgler og datoer ikke forskydes; kun de resterende ugers sessioner skrives om.
+
+  **Spørger ikke igen** efter et svar — hverken ja eller nej — medmindre *flere* uger springes over bagefter. Fejler kaldet, siger banneret eksplicit at planen er uændret, og knappen bliver klar igen.
 - [ ] UI: "Vil du justere din plan?" prompt når en uge er passeret uden loggede sessioner
 
 ---
