@@ -19,9 +19,17 @@ Sidst opdateret: 2026-09-04
 
   24 uger x 3 sessioner (72 i alt) er 3/3, mens 20 uger x 6 (120) er 1/3 — en uge-baseret cap ville udelukke gode planer og slippe dårlige igennem. Fejlen er altid den samme: modellen returnerer et forkert antal uger (`stop_reason: end_turn`), og retry redder den ikke. **Foreslået grænse: ~100 sessioner.** Derover bør algoritmen tage over. Appen falder allerede tilbage, så brugeren får en plan uanset — det her handler om at undgå spildte 35-sekunders ventetider.
 - [ ] **Server-timeouten er tæt på.** Lange planer tager 35 sek i snit at generere, og `CLAUDE_TIMEOUT_MS` er 40 sek. Hæves den, skal frontendens 95 sek klient-timeout følge med — serveren laver to forsøg, så 2 x 55 sek ville overskride den.
+
+  **Løsning (besluttet 2026-09-05):** udregn `uger × sessioner/uge` server-side i `api/generate.js` og spring Claude-kaldet helt over når totalen er over ~100. Returnér `{"error":"plan_too_large"}` så frontenden kan skelne det fra en rigtig fejl, og lad den falde tilbage med sin egen besked: "Så lang en plan laver vores algoritme bedre end AI-coachen." Værdien er at brugeren slipper for 35 sekunders ventetid på noget der alligevel fejler.
+
+  **Cappen løser også timeout-punktet ovenfor** — de eneste kald der kom tæt på 40 sek var netop de store planer. `CLAUDE_TIMEOUT_MS` skal ikke røres.
+
+  *Fravalgt:* at dele lange planer i to kald og sy dem sammen. Det ville bevare AI-kvaliteten, men fordobler ventetiden til over 70 sek, hvilket er værre end en algoritme-plan der kommer straks.
 - [ ] **Måldistance-heuristikken rammer 12/13** (ekskl. 1-ugers planer, hvor der ikke er nogen opbygning at måle). Ratio længste træning / forventet 80%: mest 1,0, med enkelte på 0,63-0,75 og én på 1,25. God nok, men ikke præcis.
 - [ ] **Automatisér aliaset** — `rangefinderapp.vercel.app` skal sættes manuelt efter hvert deploy og har nu tre gange peget på gammel kode. Overvej at gøre `rangefinderapp` til produktionsdomænet i projektindstillingerne i stedet for et manuelt alias.
-- [ ] **`icon.svg` mangler en route i `vercel.json`** — `index.html` refererer til den, men catch-all-routen sender den til `index.html`.
+
+  **Løsning:** sæt `rangefinderapp.vercel.app` som produktionsdomæne i Vercels projektindstillinger i stedet for et manuelt alias. Så peger det automatisk på nyeste produktions-deploy. Engangsindstilling, ingen kode.
+- [ ] **`icon.svg` mangler en route i `vercel.json`** — `index.html` refererer til den, men catch-all-routen sender den til `index.html`. **Løsning:** én linje i `builds` (`{"src":"icon.svg","use":"@vercel/static"}`) og én i `routes` (`{"src":"/icon.svg","dest":"/icon.svg"}`), før catch-all-routen.
 
 - [x] **Kør prompt-validering** — DONE 2026-09-04. Original prompt (fase-tabel som prosa, Claude beregner selv): **4/15 (27%)** — Haiku følger ikke pålideligt en indlejret opslagstabel. Omskrev til deterministisk fase-allokering i kode + Claude fylder kun sessioner ind: **14/15 (93%)** på første forsøg, den sidste fejl (JSON-syntaksfejl) lykkedes på almindeligt retry. CEO-planens prompt-spec er opdateret med den nye tilgang — se "Prompt spec — REWRITTEN" i planen.
 
@@ -45,15 +53,17 @@ Tre brud fandtes ved kodelæsning; alle ville have fejlet støjende i det øjebl
 ### Ændringer i index.html
 - [x] Wizard: **fitnessniveau** (dropdown) tilføjet 2026-09-05 — påkrævet af API'et, så trin 2 kunne ikke virke uden det. Værdierne er de danske strings API'et validerer; labels er engelske som resten af wizarden.
 - [x] **Længste session** fandtes allerede som "Current longest session (km, optional)" (`wLongest`) — nu mappet til `longest_session_km`.
-- [ ] **Løbsdato** (valgfri dato) — mangler stadig. "Time available"-dropdownen dækker funktionelt det samme via `plan_weeks`, så det er nu et UX-valg (dato vs. antal uger), ikke en blokering.
+- [x] **Løbsdato** — DONE 2026-09-05. `race_date` var allerede fuldt implementeret server-side (validering, dato-i-fortiden, ugeudregning, capping ved 24) men blev aldrig sendt fra frontenden — nul forekomster i index.html. Nu et valgfrit datofelt i wizarden: sættes det, viser hintet "≈ N uger til løbsdagen" live, "Tid til rådighed" dæmpes og deaktiveres, og `race_date` sendes i stedet for `plan_weeks`. Ryddes datoen, træder dropdownen til igen. Datoen gemmes som `plan.raceDate`, og algoritme-fallbacken bruger samme ugetal, så en fejlet AI-plan ikke pludselig får en anden længde.
+
+  **DST-fejl fundet undervejs:** `Math.ceil((dato - i_dag)/uge_i_ms)` gav 11 uger for 70 dage, fordi Danmark skifter fra CEST til CET undervejs — 70 dage er 70 dage plus én time i millisekunder. Rettet begge steder til at tælle hele dage først (`Math.round(diff/86400000)`), så klient og server er enige. 7 og 14 dage var korrekte i forvejen, fordi de ikke krydser skiftet.
 - [x] Plan-rendering: coach_note vises nu kursivt under sessionsnavnet i PLAN-fanen — DONE 2026-09-05. Den lå kun i den udfoldede detalje, så hele pointen med AI-planer krævede et klik pr. session. Fjernet fra detaljen så den ikke står to steder. Dæmpes til 50% når sessionen er krydset af. Algoritme-planers tekniske noter ("intervaller: 3x10 min sweet spot") vises samme sted; sessioner uden note får ingen linje.
 - [x] **Ernæring pr. session** — DONE 2026-09-05. Den gamle `nutritionFn` var abstrakt ("60-90 g kulhydrat i timen") og lå gemt i den udfoldede detalje. Erstattet af `fuelFor()` med konkrete bånd pr. sport: "1 flaske + en banan", "2 flasker + 2-3 barer", "planlæg et madstop". Hvert bånd har tre dele — `short` til plan-listen, `during` til detaljen, og `before` (kun på lange træninger) med hvad man skal spise **inden**. Deterministisk kode, ikke AI, så den virker også på algoritme-planer og koster hverken tokens eller ventetid.
 - [x] **Ordliste i "Faser og begreber"** — DONE 2026-09-05. Panelet forklarede kun faserne, men planen er fuld af fagsprog ingen havde defineret. Tilføjet RPE, Zone 2, sweet spot, tærskel, gel og carb-load. Titlen er ændret fra "Hvad betyder faserne?" da panelet nu dækker begge dele.
 - [x] **I DAG-tab: Progress Ring** — DONE 2026-09-05. SVG-ring over ugenavigationen, så den summerer præcis den uge stripen viser. `weekProgress()` læser `plan.progress` og `plan.extras` — ingen ny localStorage-struktur (eng-review-fundet). Skjules når ugen hverken har planlagte eller loggede km.
-- [ ] **I DAG-tab: km-loginput** — muligvis forældet. Der findes allerede et redigerbart km-felt (`todayActKm`) i dagens kort plus "Log session"-knappen, og det samme i PLAN-fanens detalje. Hvis punktet mente en fritstående "jeg cyklede 40 km i dag" uden tilknytning til en planlagt session, er det en anden feature end den beskrevne. Afklar før der bygges et duplikat.
+- [x] ~~I DAG-tab: km-loginput~~ — STRØGET 2026-09-05, begge tilfælde er allerede dækket. **Planlagt træning:** `todayActKm` i dagens kort (og samme felt i PLAN-fanens detalje) skriver til `plan.progress[key].actualKm`. **Uplanlagt træning:** `plan.extras` via "+ Tilføj ekstra træning", som ligger permanent nederst på I DAG med navn, km og valgfrit screenshot. Der er ikke et hul at fylde — byg ikke et tredje input.
 - [x] Loading state under generering: knap disables + spinner + "Din AI-coach tænker..." — DONE 2026-09-04, 45 sek med roterende undertekst, se HANDOFF.md
 - [x] **Fallback-besked** — DONE 2026-09-05. Gult banner øverst på PLAN-viewet. Tre varianter: generel fallback, rate limit (429), og capped plan. Banneret gemmes bevidst ikke på planobjektet — det beskriver hvad der lige skete, ikke hvad planen er.
-- [ ] Email-felt (valgfrit, sidst i wizard): "Bruges kun til at gemme din plan, når du logger ind."
+- [→] **Email-felt flyttet til C** (2026-09-05). Teksten lover "gemmes når du logger ind", men der er intet login før C. Dybere: en email i localStorage gør ikke migreringen lettere, for sign-in-flowet spørger alligevel om den. Feltet ville være indsamling uden modtager. Bygges sammen med magic link auth.
 
 ### Fejl der SKAL fixes inden kode skrives
 - [x] **Double-submit** — DONE 2026-09-04, knappen fjernes fra DOM'en under de 45 sek loading-skærm, umuligt at trykke igen
@@ -136,12 +146,16 @@ Appen var halvt engelsk (landingsside, wizard) og halvt dansk (planvisning, coac
 
 - [x] ~~Haiku max_tokens 4096 kan truncere~~ — RETTET 2026-09-05. Bekymringen var korrekt, men årsagsforklaringen var kun halvt rigtig: 4096 trunkerede fra ~22 uger x 6 sessioner, og loftet er hævet til 16000 (Haikus reelle grænse er 64000). Cappen bør sættes på **antal sessioner, ikke uger** — se punktet under "Gør nu".
 - [x] ~~Prompt injection via `goal_event`~~ — allerede implementeret. `GOAL_EVENT_MAX_CHARS = 200` afkorter server-side i `api/generate.js`. Feltet fyldes desuden af wizardens egne tal, ikke af fri brugertekst.
-- [ ] localStorage QuotaExceededError ikke håndteret. Tilføj try/catch ved plan-gemning.
+- [ ] **localStorage QuotaExceededError ikke håndteret.** `savePlan()` fejler tavst når kvoten er fuld, og brugeren mister sin plan uden at få det at vide. **Løsning:** try/catch omkring skrivningen, og vis samme banner-mekanisme som fallback-beskederne bruger. Tre linjer.
 - [ ] **(eng-review 2026-09-04)** Opgrader rate limiting til Vercel Firewall når/hvis in-memory Map bliver utilstrækkelig (reelt misbrug, eller når appen har betalende brugere). B1 bruger bevidst in-memory Map (matcher scan.js) — dette er kun en fremtidig genbesøg, ikke en aktuel mangel.
 - [x] ~~Skriv `scripts/validate-generate.mjs`~~ — DONE 2026-09-05. Kalder Anthropic direkte med endpointets egne funktioner, uden om rate limiten. Exit 0/1 så den kan bruges som gate. Kør: `node scripts/validate-generate.mjs`.
 - [x] ~~Prompt-valideringen skal køres igen~~ — KØRT 2026-09-05 efter både måldistance og engelsk variant. **15/16 (94%)**, ingen regression fra de 93%. Sprog korrekt på alle gyldige planer, måldistance-heuristikken 12/13.
 - [ ] **(prompt-validering 2026-09-04)** Fase-tabellens regel for uge 17+ ("tilføj 1 BASE uge, maks 8 BASE uger totalt") er tvetydig for uger 21-24 — tabellen siger intet om hvad der sker når BASE-loftet er nået men planen stadig skal være længere. Nuværende implementering (`allocatePhases()` i CEO-planen) fortsætter bare med at forlænge BASE forbi loftet i stedet for at gætte på noget andet. Bør genbesøges med rigtig coaching-faglig input før B1 skibes.
+
+  **Kan ikke løses uden en træner.** Kandidatregel: forlæng BUILD i stedet for BASE når BASE rammer loftet på 8. Det er et gæt, ikke fagligt funderet — og præcis den slags hvor et forkert gæt ser rigtigt ud. Spørg en rigtig coach før det implementeres.
 - [ ] **(design-review 2026-09-04, FINDING-002)** Appen har kun ét reelt `<h1>` og ingen `<h2>`-`<h6>` nogen steder — sektionstitler ("My plans", "150 km cycling", fasenavne, "How it works") er alle styled `<div>`/`<p>`, ikke semantiske headings. Skader skærmlæser-navigation (ingen heading-outline at hoppe igennem). Ikke en CSS-only fix — kræver ændringer i hver `render*`-funktion. Fortjener en dedikeret gennemgang, ikke bundlet ind i en design-polish-omgang.
+
+  **Løsning:** en fokuseret omgang gennem hver `render*`-funktion der giver sektionstitler rigtige `<h2>`-`<h4>`. Skal ikke smugles ind i en anden opgave — det rører hele UI-laget.
 
 ---
 

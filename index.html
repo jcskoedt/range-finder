@@ -815,6 +815,7 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
   font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
   color:var(--subtle);margin-top:4px;
 }
+.field-hint{font-size:11px;color:var(--subtle);margin-top:6px;line-height:1.4;}
 .ps-fuel{font-size:11px;color:var(--subtle);margin-top:4px;line-height:1.45;}
 .ps-fuel-label{
   text-transform:uppercase;font-size:9px;font-weight:700;letter-spacing:0.08em;
@@ -1021,6 +1022,8 @@ en:{
   fit_beginner:"Beginner", fit_intermediate:"Intermediate", fit_experienced:"Experienced", fit_competitive:"Competitive",
   target_distance:"Target distance (km)", time_available:"Time available", sessions_per_week:"Sessions per week",
   start_date:"Start date", min_session:"Minimum session length", current_longest:"Current longest session (km, optional)",
+  race_date:"Race date (optional)", race_date_hint:"Set this and it decides the plan length instead of the field above.",
+  weeks_to_race:"≈ {n} weeks until race day", race_date_past:"That date has already passed.",
   ph_200:"e.g. 200", ph_3:"e.g. 3", ph_80:"e.g. 80", no_minimum:"No minimum",
   generate_plan:"Generate plan →", err_target:"Enter a target distance and number of weeks.",
   weeks_1:"1 week", weeks_2:"2 weeks", weeks_4:"4 weeks (1 month)", weeks_8:"8 weeks (2 months)",
@@ -1157,6 +1160,8 @@ da:{
   fit_beginner:"Begynder", fit_intermediate:"Motionist", fit_experienced:"Erfaren", fit_competitive:"Konkurrerende",
   target_distance:"Måldistance (km)", time_available:"Tid til rådighed", sessions_per_week:"Træninger om ugen",
   start_date:"Startdato", min_session:"Korteste træning", current_longest:"Længste træning lige nu (km, valgfrit)",
+  race_date:"Løbsdato (valgfri)", race_date_hint:"Sætter du den, bestemmer den planens længde i stedet for feltet ovenfor.",
+  weeks_to_race:"≈ {n} uger til løbsdagen", race_date_past:"Den dato er allerede passeret.",
   ph_200:"fx 200", ph_3:"fx 3", ph_80:"fx 80", no_minimum:"Intet minimum",
   generate_plan:"Generér plan →", err_target:"Indtast en måldistance og et antal uger.",
   weeks_1:"1 uge", weeks_2:"2 uger", weeks_4:"4 uger (1 måned)", weeks_8:"8 uger (2 måneder)",
@@ -1444,6 +1449,22 @@ function phaseName(i,numBlocks,leftover){
   return names[Math.min(scaledIdx,names.length-1)];
 }
 
+// Whole weeks from today until the race. 0 means "no usable date" — unset,
+// malformed, or already gone. The server does its own version of this from
+// race_date; this copy exists so the wizard can show the number live and so
+// the algorithm fallback still knows how long the plan should be.
+function weeksUntil(dateStr){
+  if(!dateStr)return 0;
+  const parts=String(dateStr).split("-").map(Number);
+  if(parts.length!==3||parts.some(isNaN))return 0;
+  const d=new Date(parts[0],parts[1]-1,parts[2]);
+  if(isNaN(d.getTime()))return 0;
+  const today=new Date();today.setHours(0,0,0,0);
+  if(d<=today)return 0;
+  const days=Math.round((d-today)/86400000);
+  return Math.ceil(days/7);
+}
+
 /* ---------------- AI PLAN MAPPING ---------------- */
 // The app stores sport as ASCII keys (cykling/lob/svomning) — they double as
 // object keys and DOM data attributes. /api/generate accepts those keys but
@@ -1479,6 +1500,7 @@ function apiPlanToLocalPlan(apiPlan,wiz){
     weeksAvailable:apiPlan.weeks.length,
     sessionsPerWeek:wiz.sessionsPerWeek,
     startDate:wiz.startDate,
+    raceDate:wiz.raceDate||null,
     createdAt:new Date().toISOString().slice(0,10),
     generatedBy:"ai",
     capped:apiPlan.capped===true,
@@ -1531,7 +1553,7 @@ function isFuture(d){
 }
 
 /* ---------------- STATE ---------------- */
-let state={view:"library",planIndex:[],activePlan:null,wizardSport:"cykling",wizardFitness:"Motionist",planCache:{}};
+let state={view:"library",planIndex:[],activePlan:null,wizardSport:"cykling",wizardFitness:"Motionist",wizardRaceDate:"",planCache:{}};
 const app=document.getElementById("app");
 
 /* ---------------- LIBRARY ---------------- */
@@ -1740,6 +1762,12 @@ function renderWizard(){
         <select id="wWeeks">${WEEKS_OPTIONS.map(v=>`<option value="${v}" ${v===24?"selected":""}>${t("weeks_"+v)}</option>`).join("")}</select>
       </div>
       <div class="field">
+        <label>${t("race_date")}</label>
+        <input type="date" id="wRaceDate" value="${state.wizardRaceDate}" min="${new Date().toISOString().slice(0,10)}">
+        <div class="field-hint" id="wRaceHint">${t("race_date_hint")}</div>
+      </div>
+
+      <div class="field">
         <label>${t("sessions_per_week")}</label>
         <input type="number" id="wSessions" placeholder="${t("ph_3")}" inputmode="numeric" value="3">
       </div>
@@ -1766,6 +1794,22 @@ function renderWizard(){
     b.onclick=()=>{state.wizardSport=b.dataset.sport;renderWizard();};
   });
   document.getElementById("wFitness").onchange=(e)=>{state.wizardFitness=e.target.value;};
+  // A race date and "time available" answer the same question, so only one can
+  // win. The date does, and the weeks dropdown visibly steps aside to say so.
+  const raceEl=document.getElementById("wRaceDate");
+  const hintEl=document.getElementById("wRaceHint");
+  const weeksEl=document.getElementById("wWeeks");
+  function syncRaceDate(){
+    state.wizardRaceDate=raceEl.value||"";
+    const n=weeksUntil(raceEl.value);
+    weeksEl.disabled=n>0;
+    weeksEl.style.opacity=n>0?"0.4":"";
+    hintEl.textContent=raceEl.value
+      ?(n>0?t("weeks_to_race",{n}):t("race_date_past"))
+      :t("race_date_hint");
+  }
+  raceEl.onchange=syncRaceDate;
+  syncRaceDate();
   document.getElementById("generateBtn").onclick=async()=>{
     const target=parseFloat(document.getElementById("wTarget").value);
     const weeksAvail=parseInt(document.getElementById("wWeeks").value);
@@ -1774,6 +1818,11 @@ function renderWizard(){
     const longest=parseFloat(document.getElementById("wLongest").value)||0;
     const startDate=document.getElementById("wStartDate").value||new Date().toISOString().slice(0,10);
     const fitness=document.getElementById("wFitness").value;
+    const raceDate=document.getElementById("wRaceDate").value||"";
+    const raceWeeks=weeksUntil(raceDate);
+    // The API caps at 24 weeks; mirror that locally so the fallback plan is the
+    // same length as the AI plan would have been.
+    const weeks=raceWeeks>0?Math.min(24,raceWeeks):weeksAvail;
     if(!target||!weeksAvail){alertInline("generateBtn",t("err_target"));return;}
 
     const loadingMessages=[1,2,3,4,5].map(i=>t("load_"+i));
@@ -1809,7 +1858,7 @@ function renderWizard(){
             longest_session_km:longest,
             target_km:target,
             sessions_per_week:sessions,
-            plan_weeks:weeksAvail,
+            ...(raceWeeks>0?{race_date:raceDate}:{plan_weeks:weeksAvail}),
             // free text in the prompt, but built from the wizard's own numbers — nothing to inject through
             goal_event:target+" km "+t("goal_"+state.wizardSport),
             language:lang
@@ -1818,7 +1867,7 @@ function renderWizard(){
         });
       }finally{clearTimeout(abortTimer);}
       if(res.ok){
-        plan=apiPlanToLocalPlan(await res.json(),{sport:state.wizardSport,target,sessionsPerWeek:sessions,startDate});
+        plan=apiPlanToLocalPlan(await res.json(),{sport:state.wizardSport,target,sessionsPerWeek:sessions,startDate,raceDate});
         // WEEKS_OPTIONS goes to 52 weeks but the API caps plans at 24, so say so
         // rather than silently handing back a shorter plan than was asked for.
         if(plan.capped)notice=t("notice_capped",{n:plan.weeksAvailable});
@@ -1836,8 +1885,8 @@ function renderWizard(){
 
     if(!plan){
       if(!notice)notice=t("notice_fallback");
-      const weeks=generatePlan(state.wizardSport,target,weeksAvail,sessions,longest,minSession);
-      plan={id:"p"+Date.now(),sport:state.wizardSport,label:target+" km "+SPORTS[state.wizardSport].label.toLowerCase(),target,weeksAvailable:weeksAvail,sessionsPerWeek:sessions,startDate,createdAt:new Date().toISOString().slice(0,10),generatedBy:"algorithm",weeks,progress:{}};
+      const wk=generatePlan(state.wizardSport,target,weeks,sessions,longest,minSession);
+      plan={id:"p"+Date.now(),sport:state.wizardSport,label:target+" km "+SPORTS[state.wizardSport].label.toLowerCase(),target,weeksAvailable:weeks,sessionsPerWeek:sessions,startDate,raceDate:raceDate||null,createdAt:new Date().toISOString().slice(0,10),generatedBy:"algorithm",weeks:wk,progress:{}};
     }
 
     planNotice=notice;

@@ -320,7 +320,7 @@ export default async function handler(req, res) {
     if (raceDate < today) {
       return res.status(400).json({ error: "invalid_race_date", message: "Løbsdatoen er i fortiden." });
     }
-    weeksToRace = Math.ceil((raceDate - today) / (7 * 24 * 60 * 60 * 1000));
+    weeksToRace = Math.ceil(Math.round((raceDate - today) / 86400000) / 7);
     if (weeksToRace < 1) {
       return res.status(400).json({ error: "invalid_race_date" });
     }
