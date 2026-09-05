@@ -672,7 +672,6 @@ body{
   background:none;border:none;cursor:pointer;font-size:15px;
   line-height:1;padding:0;color:var(--text);flex-shrink:0;
 }
-.item-note{font-size:12px;color:var(--subtle);margin-top:2px;}
 .item-meta{font-size:12px;margin-top:6px;color:#444;}
 .item-meta .meta-label{
   color:var(--subtle);text-transform:uppercase;
@@ -794,6 +793,11 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
 .ps-info{flex:1;}
 .ps-label{font-size:13px;font-weight:600;}
 .ps-label.checked{color:var(--subtle);text-decoration:line-through;}
+.ps-note{
+  font-size:11px;font-style:italic;color:var(--subtle);
+  margin-top:3px;line-height:1.45;
+}
+.ps-item.done .ps-note{opacity:0.5;}
 .ps-chevron{font-size:14px;color:var(--subtle);flex-shrink:0;}
 
 /* ── REFERENCE ── */
@@ -2148,11 +2152,11 @@ function renderTabPlan(plan,c){
               <div class="ps-info">
                 ${dateStr?`<div class="item-date">${dateStr}</div>`:''}
                 <div class="ps-label${p.done?' checked':''}">${label} · ${fmtKm(km)} km</div>
+                ${note?`<div class="ps-note">${note}</div>`:''}
               </div>
               <div class="ps-chevron">${isExp?'−':'+'}</div>
             </div>
             <div class="item-detail${isExp?' open':''}">
-              ${note?`<div class="item-note" style="margin-bottom:8px;">${note}</div>`:''}
               <div class="item-meta"><span class="meta-label">${t("pace")}</span>${sport.tempoFn(label,km,note,kind)}</div>
               <div class="item-meta"><span class="meta-label">${t("nutrition")}</span>${sport.nutritionFn(km)}</div>
               <div class="item-km" style="margin-top:12px;">

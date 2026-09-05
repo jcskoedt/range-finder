@@ -46,7 +46,7 @@ Tre brud fandtes ved kodelæsning; alle ville have fejlet støjende i det øjebl
 - [x] Wizard: **fitnessniveau** (dropdown) tilføjet 2026-09-05 — påkrævet af API'et, så trin 2 kunne ikke virke uden det. Værdierne er de danske strings API'et validerer; labels er engelske som resten af wizarden.
 - [x] **Længste session** fandtes allerede som "Current longest session (km, optional)" (`wLongest`) — nu mappet til `longest_session_km`.
 - [ ] **Løbsdato** (valgfri dato) — mangler stadig. "Time available"-dropdownen dækker funktionelt det samme via `plan_weeks`, så det er nu et UX-valg (dato vs. antal uger), ikke en blokering.
-- [ ] Plan-rendering: 3-element arrays `[navn, km, coach_note]` — render coach_note som kursiv under session
+- [x] Plan-rendering: coach_note vises nu kursivt under sessionsnavnet i PLAN-fanen — DONE 2026-09-05. Den lå kun i den udfoldede detalje, så hele pointen med AI-planer krævede et klik pr. session. Fjernet fra detaljen så den ikke står to steder. Dæmpes til 50% når sessionen er krydset af. Algoritme-planers tekniske noter ("intervaller: 3x10 min sweet spot") vises samme sted; sessioner uden note får ingen linje.
 - [ ] I DAG-tab: Progress Ring (SVG-cirkel, km logget / km planlagt for ugen)
 - [ ] I DAG-tab: km-loginput ("Km logget i dag") skriver til localStorage
 - [x] Loading state under generering: knap disables + spinner + "Din AI-coach tænker..." — DONE 2026-09-04, 45 sek med roterende undertekst, se HANDOFF.md
@@ -132,12 +132,12 @@ Appen var halvt engelsk (landingsside, wizard) og halvt dansk (planvisning, coac
 
 ## 🔧 Kendte tekniske bekymringer
 
-- [ ] Haiku max_tokens 4096 kan truncere 24-ugers planer. Overvej cap på 20 uger til det er testet.
-- [ ] Prompt injection via `goal_event`-felt. Mitigér: max 200 chars server-side.
+- [x] ~~Haiku max_tokens 4096 kan truncere~~ — RETTET 2026-09-05. Bekymringen var korrekt, men årsagsforklaringen var kun halvt rigtig: 4096 trunkerede fra ~22 uger x 6 sessioner, og loftet er hævet til 16000 (Haikus reelle grænse er 64000). Cappen bør sættes på **antal sessioner, ikke uger** — se punktet under "Gør nu".
+- [x] ~~Prompt injection via `goal_event`~~ — allerede implementeret. `GOAL_EVENT_MAX_CHARS = 200` afkorter server-side i `api/generate.js`. Feltet fyldes desuden af wizardens egne tal, ikke af fri brugertekst.
 - [ ] localStorage QuotaExceededError ikke håndteret. Tilføj try/catch ved plan-gemning.
 - [ ] **(eng-review 2026-09-04)** Opgrader rate limiting til Vercel Firewall når/hvis in-memory Map bliver utilstrækkelig (reelt misbrug, eller når appen har betalende brugere). B1 bruger bevidst in-memory Map (matcher scan.js) — dette er kun en fremtidig genbesøg, ikke en aktuel mangel.
-- [ ] **(eng-review 2026-09-04)** Skriv `scripts/validate-generate.mjs` — genkørbart script der sender de 10-20 sample-inputs mod `/api/generate` og tjekker JSON-schema-validitet, i stedet for den nuværende manuelle valideringsgate. Deferred — B1 kører uden for nu.
-- [ ] **(trin 1, 2026-09-05) Prompt-valideringen skal køres igen.** De målte 93% (14/15) gælder den gamle prompt. `target_km` tilføjede to nye ting Haiku skal ramme: at planens længste session lander omkring 80% af målet, og at måldistancen gennemføres i sidste uge. Ingen af delene er målt. Tallet i prompten er beregnet i JS, ikke overladt til modellen — netop den lektie valideringen gav — men adfærden er stadig uverificeret.
+- [x] ~~Skriv `scripts/validate-generate.mjs`~~ — DONE 2026-09-05. Kalder Anthropic direkte med endpointets egne funktioner, uden om rate limiten. Exit 0/1 så den kan bruges som gate. Kør: `node scripts/validate-generate.mjs`.
+- [x] ~~Prompt-valideringen skal køres igen~~ — KØRT 2026-09-05 efter både måldistance og engelsk variant. **15/16 (94%)**, ingen regression fra de 93%. Sprog korrekt på alle gyldige planer, måldistance-heuristikken 12/13.
 - [ ] **(prompt-validering 2026-09-04)** Fase-tabellens regel for uge 17+ ("tilføj 1 BASE uge, maks 8 BASE uger totalt") er tvetydig for uger 21-24 — tabellen siger intet om hvad der sker når BASE-loftet er nået men planen stadig skal være længere. Nuværende implementering (`allocatePhases()` i CEO-planen) fortsætter bare med at forlænge BASE forbi loftet i stedet for at gætte på noget andet. Bør genbesøges med rigtig coaching-faglig input før B1 skibes.
 - [ ] **(design-review 2026-09-04, FINDING-002)** Appen har kun ét reelt `<h1>` og ingen `<h2>`-`<h6>` nogen steder — sektionstitler ("My plans", "150 km cycling", fasenavne, "How it works") er alle styled `<div>`/`<p>`, ikke semantiske headings. Skader skærmlæser-navigation (ingen heading-outline at hoppe igennem). Ikke en CSS-only fix — kræver ændringer i hver `render*`-funktion. Fortjener en dedikeret gennemgang, ikke bundlet ind i en design-polish-omgang.
 
