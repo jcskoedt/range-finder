@@ -1035,6 +1035,7 @@ en:{
   load_4:"Writing coach notes…", load_5:"Final polish…",
   notice_capped:"Your plan was shortened to {n} weeks — that's the longest plan the AI coach makes.",
   notice_ratelimit:"You've made a lot of plans in a short time. This one uses our own algorithm.",
+  notice_too_large:"A plan that long is better handled by our own algorithm than by the AI coach — so that is what this one is.",
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
   close:"Close",
   // plan view
@@ -1172,6 +1173,7 @@ da:{
   load_4:"Skriver coach-noter…", load_5:"Sidste finpudsning…",
   notice_capped:"Planen er forkortet til {n} uger — det er den længste plan AI-coachen laver.",
   notice_ratelimit:"Du har lavet mange planer på kort tid. Denne er lavet med vores egen algoritme.",
+  notice_too_large:"Så lang en plan laver vores egen algoritme bedre end AI-coachen — så det er den, du får her.",
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
   close:"Luk",
   back_plans:"← Planer", tab_today:"I dag", tab_plan:"Plan", tab_stats:"Tal",
@@ -1875,6 +1877,7 @@ function renderWizard(){
         let err=null;try{err=await res.json();}catch(e){}
         console.warn("[generate] HTTP "+res.status+" "+((err&&err.error)||""));
         if(res.status===429)notice=t("notice_ratelimit");
+        else if(err&&err.error==="plan_too_large")notice=t("notice_too_large");
       }
     }catch(e){
       // Network failure, the abort above, or a malformed plan — all fall back.

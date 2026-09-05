@@ -9,22 +9,14 @@ Sidst opdateret: 2026-09-04
 - [x] **Prompt-validering kørt igen** — 2026-09-05, efter måldistance + engelsk variant. **15/16 gyldige (94%)**, 14/16 i første forsøg. Ingen regression fra de 93% før ændringerne. Kør igen med `node scripts/validate-generate.mjs`.
 - [x] **`scripts/validate-generate.mjs` skrevet** — den udskudte opgave fra eng-review. Kalder Anthropic direkte med endpointets egne funktioner (importeret, ikke kopieret), så rate limiten ikke er i vejen. 16 samples på tværs af sportsgrene, niveauer, planlængder og begge sprog. Exit-kode 0/1, så den kan bruges som gate.
 - [x] **`max_tokens` var sat 16x for lavt** — RETTET 2026-09-05. Koden brugte 4096; Haiku 4.5's reelle loft er **64000** (bekræftet med `client.models.retrieve`, ikke antaget — det lukker det åbne spørgsmål i HANDOFF). Lange planer bruger op til 4693 output-tokens, så de blev trunkeret. Hævet til 16000 (SDK'ets anbefaling for ikke-streamende kald). Efter ændringen optræder `stop_reason: max_tokens` ikke længere i nogen kørsel. Det koster intet ekstra — man betaler pr. genereret token, ikke pr. loft.
-- [ ] **Cap AI-planer på ANTAL SESSIONER, ikke uger.** Sweep over planlængde (`node scripts/sweep-plan-length.mjs`, 9 punkter x 3 forsøg) viser at pålideligheden følger uger x sessioner/uge, ikke uger alene:
+- [x] **Cap på antal sessioner** — DONE 2026-09-05. `MAX_TOTAL_SESSIONS = 100` i `api/generate.js`. Over grænsen springes Claude-kaldet helt over og der returneres `422 plan_too_large` med tallene; frontenden falder tilbage til algoritmen og siger hvorfor. Fejler på ~200 ms i stedet for ~35 sek.
 
-  | sessioner i alt | bestået |
-  |---|---|
-  | 48-72 | 3/3, 3/3, 3/3 |
-  | 96-108 | 2/3, 3/3, 2/3 |
-  | 120-144 | 1/3, 0/3, 1/3 |
+  Grænsen går på **sessioner, ikke uger** — `24u × 4 = 96` slipper igennem, mens `17u × 6 = 102` afvises. En ugebaseret cap ville have afvist den første, som målte 3/3.
 
-  24 uger x 3 sessioner (72 i alt) er 3/3, mens 20 uger x 6 (120) er 1/3 — en uge-baseret cap ville udelukke gode planer og slippe dårlige igennem. Fejlen er altid den samme: modellen returnerer et forkert antal uger (`stop_reason: end_turn`), og retry redder den ikke. **Foreslået grænse: ~100 sessioner.** Derover bør algoritmen tage over. Appen falder allerede tilbage, så brugeren får en plan uanset — det her handler om at undgå spildte 35-sekunders ventetider.
-- [ ] **Server-timeouten er tæt på.** Lange planer tager 35 sek i snit at generere, og `CLAUDE_TIMEOUT_MS` er 40 sek. Hæves den, skal frontendens 95 sek klient-timeout følge med — serveren laver to forsøg, så 2 x 55 sek ville overskride den.
+  **Jeg flyttede den kortvarigt til 90 og rullede det tilbage.** Gate-sample #06 (20u × 5 = 100) havde fejlet 3 af 4 kørsler, hvilket lignede et argument. Men `24u × 4` er også 96 sessioner og målte 3/3, så 90 ville udelukke en form der beviseligt virker — på styrken af én konfiguration. Ved n=3 kan 2/3 og 3/3 ikke skelnes. Efterfølgende kørsel gav **16/16**, inklusive #06. Fejlene var støj.
 
-  **Løsning (besluttet 2026-09-05):** udregn `uger × sessioner/uge` server-side i `api/generate.js` og spring Claude-kaldet helt over når totalen er over ~100. Returnér `{"error":"plan_too_large"}` så frontenden kan skelne det fra en rigtig fejl, og lad den falde tilbage med sin egen besked: "Så lang en plan laver vores algoritme bedre end AI-coachen." Værdien er at brugeren slipper for 35 sekunders ventetid på noget der alligevel fejler.
+  Data understøtter: 120+ fejler ofte (2 af 9), 108 og derunder holder mest (11 af 12). 100 ligger bevidst inde i det usikre bånd — fallbacken er hurtig og pæn, så det koster mindre at være rundhåndet end at afvise planer modellen klarer fint.
 
-  **Cappen løser også timeout-punktet ovenfor** — de eneste kald der kom tæt på 40 sek var netop de store planer. `CLAUDE_TIMEOUT_MS` skal ikke røres.
-
-  *Fravalgt:* at dele lange planer i to kald og sy dem sammen. Det ville bevare AI-kvaliteten, men fordobler ventetiden til over 70 sek, hvilket er værre end en algoritme-plan der kommer straks.
 - [ ] **Måldistance-heuristikken rammer 12/13** (ekskl. 1-ugers planer, hvor der ikke er nogen opbygning at måle). Ratio længste træning / forventet 80%: mest 1,0, med enkelte på 0,63-0,75 og én på 1,25. God nok, men ikke præcis.
 - [x] **Aliaset er automatiseret** — DONE 2026-09-05. `rangefinderapp.vercel.app` er sat til *Connect to an environment → Production* i projektindstillingerne og følger nu nyeste produktions-deploy af sig selv. Verificeret: domænet serverer ring, løbsdato, ernæring, ordliste og DST-rettelsen, og API'et svarer 200. **Kør aldrig `vercel alias set` på det domæne igen** — det ville pinne det forfra.
 - [ ] **`icon.svg` mangler en route i `vercel.json`** — `index.html` refererer til den, men catch-all-routen sender den til `index.html`. **Løsning:** én linje i `builds` (`{"src":"icon.svg","use":"@vercel/static"}`) og én i `routes` (`{"src":"/icon.svg","dest":"/icon.svg"}`), før catch-all-routen.

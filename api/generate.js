@@ -61,6 +61,27 @@ const FITNESS_SESSIONS = { Begynder: 3, Motionist: 4, Erfaren: 5, Konkurrerende:
 // the local generatePlan() fallback uses, so an AI plan and a fallback plan for
 // the same input build toward the same place.
 const PEAK_FRACTION = 0.8;
+// Haiku loses count on big plans. Measured 2026-09-05 with
+// scripts/sweep-plan-length.mjs, 3 attempts per point, at 6 sessions/week:
+//   48-72 sessions   3/3, 3/3, 3/3
+//   96-108           2/3, 3/3, 2/3
+//   120-144          1/3, 0/3, 1/3
+// It returns the wrong number of weeks (stop_reason "end_turn", not
+// truncation) and the retry does not rescue it. The controls at 24 weeks with
+// 3 and 4 sessions both passed 3/3, so the axis is total sessions, not weeks —
+// a week-based cap would exclude good plans and admit bad ones. 100 is a line
+// drawn through noisy data (n=3 per point), not a cliff edge.
+//
+// I briefly moved this to 90, because gate sample #06 (20 weeks x 5 = 100
+// sessions) has failed 3 of 4 runs. Backed out: 24 weeks x 4 is also 96
+// sessions and passed 3/3, so 90 would exclude a shape that demonstrably works
+// on the strength of one configuration, and at n=3 a 2/3 and a 3/3 are not
+// distinguishable. The honest read of the data is "120+ fails often (2 of 9),
+// 108 and below mostly holds (11 of 12)". 100 therefore sits inside the
+// uncertain band on purpose: the fallback is fast and graceful, so erring
+// generous costs less than turning away plans the model handles fine. If #06
+// keeps failing in future gate runs, lower it — but not on one sample.
+const MAX_TOTAL_SESSIONS = 100;
 // The app has a DA/EN toggle, so the plan text has to follow it. Absent =
 // Danish, which is what every caller before this sent.
 const VALID_LANGUAGES = ["da", "en"];
@@ -334,6 +355,21 @@ export default async function handler(req, res) {
   const capped = weeksToRace > MAX_WEEKS;
   if (capped) weeksToRace = MAX_WEEKS;
 
+  // Decline rather than spend 35 seconds on a plan that will probably come back
+  // with the wrong number of weeks. The app falls back to its own algorithm,
+  // which handles long plans fine — the point is to fail in 200ms, not 35s.
+  const effectiveSessions = sessionsPerWeek ?? FITNESS_SESSIONS[fitness_level];
+  const totalSessions = weeksToRace * effectiveSessions;
+  if (totalSessions > MAX_TOTAL_SESSIONS) {
+    return res.status(422).json({
+      error: "plan_too_large",
+      weeks: weeksToRace,
+      sessions_per_week: effectiveSessions,
+      total_sessions: totalSessions,
+      max_total_sessions: MAX_TOTAL_SESSIONS,
+    });
+  }
+
   const input = {
     sport,
     fitness_level,
@@ -365,6 +401,7 @@ export {
   MODEL,
   MAX_TOKENS,
   MAX_WEEKS,
+  MAX_TOTAL_SESSIONS,
   PEAK_FRACTION,
   FITNESS_SESSIONS,
   SPORT_ALIASES,

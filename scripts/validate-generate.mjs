@@ -31,6 +31,9 @@ const TIMEOUT_MS = 60000;
 // Spread across sports, fitness levels, plan lengths and both languages,
 // including the short plans that have no PEAK phase and the long ones that
 // exercise allocatePhases()' extend-BASE branch.
+// Every sample stays within MAX_TOTAL_SESSIONS (weeks x sessions/week <= 100).
+// Past that the endpoint declines before calling Claude, so a bigger sample
+// would measure a shape production never sends.
 const SAMPLES = [
   { sport: "løb",      fitness_level: "Motionist",     longest_session_km: 10, target_km: 42,  plan_weeks: 12, language: "da" },
   { sport: "løb",      fitness_level: "Begynder",      longest_session_km: 5,  target_km: 21,  plan_weeks: 8,  language: "da" },
@@ -39,7 +42,7 @@ const SAMPLES = [
   { sport: "cykling",  fitness_level: "Motionist",     longest_session_km: 40, target_km: 200, plan_weeks: 12, language: "da" },
   { sport: "cykling",  fitness_level: "Erfaren",       longest_session_km: 60, target_km: 300, plan_weeks: 20, language: "da" },
   { sport: "cykling",  fitness_level: "Begynder",      longest_session_km: 20, target_km: 100, plan_weeks: 10, language: "en" },
-  { sport: "cykling",  fitness_level: "Konkurrerende", longest_session_km: 80, target_km: 250, plan_weeks: 24, language: "en" },
+  { sport: "cykling",  fitness_level: "Motionist",     longest_session_km: 80, target_km: 250, plan_weeks: 24, language: "en" },
   { sport: "cykling",  fitness_level: "Motionist",     longest_session_km: 30, target_km: 150, plan_weeks: 3,  language: "da" },
   { sport: "svømning", fitness_level: "Begynder",      longest_session_km: 1,  target_km: 5,   plan_weeks: 8,  language: "da" },
   { sport: "svømning", fitness_level: "Motionist",     longest_session_km: 2,  target_km: 10,  plan_weeks: 12, language: "en" },
@@ -84,6 +87,31 @@ async function once(sample, phases) {
   return { plan: extractJson(raw), stop: msg.stop_reason, rawLen: raw.length };
 }
 
+// Mirrors validatePlan's checks in order and names the first one that fails.
+// "plan invalid" alone sent me looking at the week count when the fault was
+// elsewhere.
+function whyInvalid(plan, sport, phases, stop) {
+  const at = ` (stop=${stop})`;
+  if (typeof plan?.label !== "string" || !plan.label.trim()) return "manglende label" + at;
+  if (plan.sport !== sport) return `sport "${plan.sport}" != "${sport}"` + at;
+  if (!Array.isArray(plan.weeks)) return "weeks er ikke et array" + at;
+  if (plan.weeks.length !== phases.length) return `${plan.weeks.length} uger, forventet ${phases.length}` + at;
+  for (let i = 0; i < plan.weeks.length; i++) {
+    const w = plan.weeks[i];
+    if (w.phase !== phases[i]) return `uge ${i + 1}: fase "${w.phase}", forventet "${phases[i]}"` + at;
+    if (!Array.isArray(w.items) || w.items.length === 0) return `uge ${i + 1}: ingen sessioner` + at;
+    for (let k = 0; k < w.items.length; k++) {
+      const it = w.items[k];
+      if (!Array.isArray(it) || it.length !== 3)
+        return `uge ${i + 1} session ${k + 1}: ${Array.isArray(it) ? it.length + " felter, forventet 3" : "ikke et array"}` + at;
+      if (typeof it[0] !== "string" || !it[0].trim()) return `uge ${i + 1} session ${k + 1}: tomt navn` + at;
+      if (typeof it[1] !== "number" || it[1] < 0) return `uge ${i + 1} session ${k + 1}: km er ${JSON.stringify(it[1])}` + at;
+      if (typeof it[2] !== "string" || !it[2].trim()) return `uge ${i + 1} session ${k + 1}: tom coach-note` + at;
+    }
+  }
+  return "ukendt" + at;
+}
+
 async function run(sample, i) {
   const weeks = Math.min(sample.plan_weeks, 24);
   const phases = allocatePhases(weeks);
@@ -96,15 +124,17 @@ async function run(sample, i) {
     if (!res.firstTry) out = await once(sample, phases); // the endpoint retries once
     let plan = out.plan;
     if (!plan || !validatePlan(plan, sample.sport, phases)) {
-      res.error = !plan
-        ? `unparseable (stop=${out.stop}, ${out.rawLen} tegn)`
-        : `plan invalid (stop=${out.stop}, ${plan.weeks?.length ?? "?"} uger, forventet ${phases.length})`;
+      res.error = !plan ? `unparseable (stop=${out.stop}, ${out.rawLen} tegn)` : whyInvalid(plan, sample.sport, phases, out.stop);
       return res;
     }
     res.schema = true;
     res.phases = plan.weeks.every((w, k) => w.phase === phases[k]);
     const want = sample.sessions_per_week ?? FITNESS_SESSIONS[sample.fitness_level];
     res.sessions = plan.weeks.every((w) => w.items.length === want);
+    if (!res.sessions) {
+      const counts = [...new Set(plan.weeks.map((w) => w.items.length))].sort((a, b) => a - b);
+      res.error = `sessioner/uge: fik ${counts.join("/")}, forventet ${want}`;
+    }
     res.lang = checkLanguage(plan, sample.language);
     if (sample.target_km) {
       // Exclude the final week: it holds the race itself at full target
