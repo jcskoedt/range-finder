@@ -5,7 +5,7 @@ Sidst opdateret: 2026-09-06
 
 En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, måldistance, niveau og enten et antal uger eller en løbsdato; Claude Haiku genererer en plan med faser, sessioner og coach-noter. Planen bor i browserens localStorage. Ingen konti, ingen server-database.
 
-**Single-file SPA** — hele frontenden er `index.html` (3090 linjer, inkl. CSS og JS). Tre Vercel-funktioner i `api/`.
+**Single-file SPA** — hele frontenden er `index.html` (3114 linjer, inkl. CSS og JS). Tre Vercel-funktioner i `api/`.
 
 ---
 
@@ -16,7 +16,7 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | | |
 |---|---|
 | AI-plangenerering | virker, dansk og engelsk |
-| Replan efter sprungne uger | virker |
+| Replan efter sprungne uger | virker — **rettet 2026-09-06, havde aldrig virket i produktion** |
 | Screenshot-import (Strava m.fl.) | virker |
 | Del plan som link | virker |
 | Kalender-eksport (.ics) | virker |
@@ -25,6 +25,8 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Måling (Vercel Web Analytics) | virker, verificeret i produktion 2026-09-06 |
 
 Tilbage: **C** (konti + cloud sync) og en håndfuld mindre punkter — se `TODOS.md`.
+
+C er designet færdigt: `docs/superpowers/specs/2026-09-06-c-cloud-sync-design.md`. Ti beslutninger, datamodel, fletteregler og testtilfælde. Læs den før du rører C.
 
 Målingen kører. Verificeret i produktion 2026-09-06: `/_vercel/insights/script.js` svarer `200 application/javascript`, 3106 bytes — det rigtige script, ikke SPA'en. Det bekræfter både routing-rettelsen og at toggle'en er sat, for edge injicerer kun scriptet når Web Analytics er slået til.
 
@@ -142,6 +144,15 @@ curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
 ```
 HTML betyder at en rute sluger den. De seks eksplicitte statiske ruter er overflødige nu, men står der stadig.
 
+### Replan havde aldrig virket — to fejl der skjulte hinanden
+Fundet 2026-09-06 ved at teste `replan_used`-eventet ende til ende. Endpointet havde ligget i produktion i et døgn uden nogensinde at svare 200.
+
+**Fasen er en visningstekst, ikke en nøgle.** `runReplan` sendte `plan.weeks[i].phase` direkte videre, men den streng er lokaliseret, blok-nummereret og nogle gange suffikset: "Base 1", "Build 2 · restitution", "Løbsuge". Serveren validerer mod `BASE / BUILD / PEAK / TAPER / RACE WEEK`, så hver eneste replan blev afvist med 400 før den nåede modellen. `toUpperCase()` ville ikke have hjulpet — den danske løbsuge hedder "Løbsuge". Ugerne bærer nu `phaseKey` ved siden af `phase`.
+
+**Sessionsantal er pr. uge, ikke pr. plan.** Serveren udledte ét tal og krævede at hver returneret uge havde præcis så mange sessioner. Men en løbsuge har legitimt færre end en build-uge. Målt mod produktion før rettelsen: sender man `[3,3,2]` ind, kommer `[3,3,3]` retur med status 200 — løbsugen får lydløst en session den ikke skulle have. Sender man `[4,3,2]`, afvises svaret to gange og ender som 500 efter to betalte kald. Hvilken af de to man rammer er ikke deterministisk, for det afhænger af om modellen adlyder instruktionen eller spejler sit input.
+
+Lektien er fasetabellens, en etage dybere: **struktur i kode, og strukturen skal have den rigtige granularitet.** Ét sessionstal for hele planen var forkert på præcis samme måde som én prosatabel for alle uger var det.
+
 ### Vercel læser ikke `.gitignore`
 Uden `.vercelignore` uploades hele mappen. En 130MB fil i en urelateret mappe væltede et deploy med *"File size limit exceeded (100 MB)"*.
 
@@ -165,7 +176,7 @@ Screenshot-importen blev engang efterladt uden `wireUploadArea()`, og `api/scan.
 
    Målingen kører nu i produktion. Når der er data, er `session_logged` delt på `source` det tætteste svar uden at spørge folk: krydser AI-brugere flere sessioner af over flere uger end algoritme-brugere, betyder planen noget. CEO-planens Gate 0 — fem rigtige brugere der laver en plan og logger en session — aflæses på `plan_generated` og `session_logged`.
 2. **Fase-tabellens hul for uge 21-24.** Reglen siger "tilføj 1 BASE-uge, maks 8 BASE-uger totalt", men ikke hvad der sker når loftet er nået og planen skal være længere. Koden forlænger bare BASE videre. Kræver en rigtig coach — en kandidatregel er at forlænge BUILD i stedet, men det er et gæt.
-3. **Sikkerhed ved C.** Implicit auth flow (token i URL-hash) blev accepteret som trade-off for B. Skal genbesøges.
+3. ~~**Sikkerhed ved C.**~~ Genbesøgt og afgjort 2026-09-06: implicit flow beholdes, PKCE fravalgt bevidst. Det forpligter til `Cache-Control: no-store` på `index.html`, ellers kan en cachet side med et token i hashet nå den forkerte browser. Se specen.
 
 ---
 
@@ -208,6 +219,7 @@ Kald der afvises før modellen (400, 422, 429) og alt mod den lokale stub-server
 | `api/scan.js` | Screenshot → aktiviteter |
 | `scripts/validate-generate.mjs` | Prompt-gate, 16 samples, exit 0/1 |
 | `scripts/sweep-plan-length.mjs` | Finder hvor lange planer knækker |
+| `docs/superpowers/specs/` | Design-specs. C ligger i `2026-09-06-c-cloud-sync-design.md` |
 | `vercel.json` | Routing. Bruger det gamle `builds`-format — `functions` og `builds` udelukker hinanden. catch-all'en skal blive stående som `/(?!_vercel/)(.*)`, ellers sluger den `/_vercel/*` |
 | `.vercelignore` | Vercel læser ikke `.gitignore` |
 | `TODOS.md` | Opgaveliste med begrundelser og fravalg |
