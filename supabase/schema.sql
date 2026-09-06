@@ -90,4 +90,17 @@ begin
 end;
 $$;
 
+-- Shut the door on the anon key: without this, anyone holding it could call the
+-- function directly with someone else's p_user_id, and security definer means
+-- RLS would not stop them.
 revoke all on function sync_library(uuid, jsonb, bigint) from public, anon, authenticated;
+
+-- And open it again for the endpoint. Postgres grants EXECUTE to PUBLIC by
+-- default and service_role inherits that rather than being a superuser, so the
+-- revoke above takes it away too. PostgREST then reports the function as
+-- "not found in schema cache" rather than as a permission error, which reads
+-- like the function is missing from a database where it plainly exists.
+grant execute on function sync_library(uuid, jsonb, bigint) to service_role;
+
+-- Make PostgREST pick the change up now rather than whenever it next notices.
+notify pgrst, 'reload schema';
