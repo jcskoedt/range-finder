@@ -9,9 +9,11 @@ screenshots/
 *.md
 .DS_Store
 
-# Not part of the deploy: applied by hand in Supabase, and design docs
+# Not part of the deploy: applied by hand in Supabase, design docs, and the
+# MCP server config, which is a local tool setting and not a served asset.
 supabase/
 docs/
+.mcp.json
 
 # Source assets that no route in vercel.json points at
 RANGE_FINDER_LOGO.png
