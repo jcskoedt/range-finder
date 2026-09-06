@@ -689,6 +689,23 @@ body{
   background:none;border:none;color:#fff;cursor:pointer;
   font-size:14px;line-height:1;padding:0;flex-shrink:0;
 }
+.auth-box{
+  margin:24px 24px 0;padding:18px 16px;border:2px solid var(--border);
+  display:flex;flex-direction:column;gap:10px;position:relative;
+}
+.auth-box .auth-title{font-family:"Turret Road",sans-serif;font-weight:700;font-size:15px;}
+.auth-box .auth-body{font-size:13px;color:var(--subtle);line-height:1.5;max-width:46ch;}
+.auth-box input{
+  font-family:inherit;font-size:14px;padding:10px 12px;
+  border:1px solid var(--border);background:var(--bg);color:var(--text);width:100%;
+}
+.auth-box .auth-row{display:flex;gap:8px;flex-wrap:wrap;}
+.auth-box .auth-row input{flex:1 1 200px;}
+.auth-dismiss{
+  position:absolute;top:8px;right:10px;background:none;border:none;
+  font-size:18px;line-height:1;color:var(--subtle);cursor:pointer;padding:4px;
+}
+.auth-who{font-size:12px;color:var(--subtle);}
 .sync-badge{
   position:fixed;bottom:22px;left:16px;z-index:50;
   font-size:10px;font-weight:200;letter-spacing:0.1em;text-transform:uppercase;
@@ -1935,6 +1952,51 @@ async function signOut(){
   state.session=null;render();
 }
 
+/* ---------------- LOGIN-BOKS ---------------- */
+// Offered after the first plan exists, not before: at that point the athlete
+// has seen the app work and has something to lose. Dismissing it is permanent
+// until they go looking — a backup nobody switches on protects nobody, but
+// nagging is worse.
+function authBoxHtml(){
+  if(!sb)return "";
+  if(state.session){
+    const email=(state.session.user&&state.session.user.email)||"";
+    return `<div class="auth-box">
+      <div class="auth-who">${t("auth_signed_in",{email:email})}</div>
+      <div class="auth-row"><button class="btn btn-outline" id="authOut">${t("auth_signout")}</button></div>
+    </div>`;
+  }
+  if(localStorage.getItem("authDismissed"))return "";
+  return `<div class="auth-box">
+    <button class="auth-dismiss" id="authDismiss" aria-label="${t("auth_send")}">&times;</button>
+    <div class="auth-title">${t("auth_save_title")}</div>
+    <div class="auth-body">${t("auth_save_body")}</div>
+    <div class="auth-row">
+      <input type="email" id="authEmail" placeholder="${t("auth_email_ph")}" autocomplete="email">
+      <button class="btn btn-outline" id="authSend">${t("auth_send")}</button>
+    </div>
+  </div>`;
+}
+
+// Markup without wiring has shipped in this project before and nobody noticed
+// for days, so these are wired in the same function that renders the tab.
+function wireAuthBox(){
+  const send=document.getElementById("authSend");
+  if(send)send.onclick=async()=>{
+    const el=document.getElementById("authEmail");
+    const email=(el&&el.value||"").trim();
+    if(!email)return;
+    send.disabled=true;
+    const ok=await signIn(email);
+    send.disabled=false;
+    alertInline("authSend",ok?t("auth_sent"):t("auth_failed"));
+  };
+  const dismiss=document.getElementById("authDismiss");
+  if(dismiss)dismiss.onclick=()=>{try{localStorage.setItem("authDismissed","1");}catch(e){}render();};
+  const out=document.getElementById("authOut");
+  if(out)out.onclick=()=>signOut();
+}
+
 /* ---------------- CLOUD SYNC ---------------- */
 // localStorage is written first, always. Everything here only adds a backup, so
 // a failure delays the backup and never costs the user anything.
@@ -3073,6 +3135,7 @@ function renderTabPlan(plan,c){
     </div>
     <div class="share-hint" id="shareHint"></div>
   </div>
+  ${authBoxHtml()}
 `;
 
   // Build the link now, not on click. writeText() needs the click to still count
@@ -3088,6 +3151,8 @@ function renderTabPlan(plan,c){
     track("plan_exported",{events:n});
     hint.textContent=!n?t("export_ical_none"):n===1?t("export_ical_done_one"):t("export_ical_done_many",{n:n});
   };
+
+  wireAuthBox();
 
   const shareBtn=document.getElementById("sharePlanBtn");
   if(shareBtn)shareBtn.onclick=async()=>{
@@ -3320,6 +3385,7 @@ function render(){
   if(state.view==="library")renderLibrary();
   else if(state.view==="wizard")renderWizard();
   else if(state.view==="plan")renderPlanView();
+  renderSyncBadge();
 }
 (async function init(){
   document.getElementById("langToggle").querySelectorAll("button").forEach(b=>{
