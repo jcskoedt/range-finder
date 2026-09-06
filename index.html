@@ -1197,6 +1197,9 @@ en:{
   auth_failed:"Could not send the link. Try again.", auth_signout:"Sign out", auth_signed_in:"Signed in as {email}",
   auth_consent:"Your address is used for one thing: sending you a sign-in link. Your plans and progress are stored so you can get them back. Nothing else, and no marketing.",
   auth_privacy:"Privacy policy",
+  auth_delete:"Delete account", auth_delete_sure:"⚠ Sure? Tap again",
+  auth_delete_working:"Deleting…", auth_delete_failed:"Could not delete. Try again.",
+  auth_delete_note:"Deleting removes your account and the cloud copy for good. The plans stay in this browser.",
   sync_saved:"Backed up", sync_saving:"Saving", sync_pending:"Not saved yet",
   export_ical_done_one:"1 session downloaded — open the file to add it to your calendar.",
   export_ical_done_many:"{n} sessions downloaded — open the file to add them to your calendar.",
@@ -1356,6 +1359,9 @@ da:{
   auth_failed:"Linket kunne ikke sendes. Prøv igen.", auth_signout:"Log ud", auth_signed_in:"Logget ind som {email}",
   auth_consent:"Din adresse bruges til én ting: at sende dig et login-link. Dine planer og din fremdrift gemmes, så du kan få dem igen. Ikke andet, og ingen markedsføring.",
   auth_privacy:"Privatlivspolitik",
+  auth_delete:"Slet konto", auth_delete_sure:"⚠ Sikker? Tryk igen",
+  auth_delete_working:"Sletter…", auth_delete_failed:"Kunne ikke slettes. Prøv igen.",
+  auth_delete_note:"Sletning fjerner din konto og kopien i skyen for altid. Planerne bliver i denne browser.",
   sync_saved:"Gemt i skyen", sync_saving:"Gemmer", sync_pending:"Ikke gemt endnu",
   export_ical_done_one:"1 træning hentet — åbn filen for at lægge den i din kalender.",
   export_ical_done_many:"{n} træninger hentet — åbn filen for at lægge dem i din kalender.",
@@ -2040,7 +2046,11 @@ function authBoxHtml(){
     const email=(state.session.user&&state.session.user.email)||"";
     return `<div class="auth-box">
       <div class="auth-who">${t("auth_signed_in",{email:email})}</div>
-      <div class="auth-row"><button class="btn btn-outline" id="authOut">${t("auth_signout")}</button></div>
+      <div class="auth-row">
+        <button class="btn btn-outline" id="authOut">${t("auth_signout")}</button>
+        <button class="btn-danger" id="authDelete">${t("auth_delete")}</button>
+      </div>
+      <div class="auth-consent">${t("auth_delete_note")}</div>
     </div>`;
   }
   if(localStorage.getItem("authDismissed"))return "";
@@ -2073,6 +2083,35 @@ function wireAuthBox(){
   if(dismiss)dismiss.onclick=()=>{try{localStorage.setItem("authDismissed","1");}catch(e){}render();};
   const out=document.getElementById("authOut");
   if(out)out.onclick=()=>signOut();
+
+  // Two clicks, like the plan delete on the TAL tab. This one is bigger — it
+  // takes the account and every plan with it — so it also says what will go.
+  let sletArmeret=false;
+  const del=document.getElementById("authDelete");
+  if(del)del.onclick=async()=>{
+    if(!sletArmeret){
+      sletArmeret=true;
+      del.textContent=t("auth_delete_sure");
+      setTimeout(()=>{const d=document.getElementById("authDelete");if(d){sletArmeret=false;d.textContent=t("auth_delete");}},4000);
+      return;
+    }
+    del.disabled=true;del.textContent=t("auth_delete_working");
+    try{
+      const res=await fetch("/api/sync",{method:"DELETE",
+        headers:{"Authorization":"Bearer "+state.session.access_token}});
+      if(!res.ok)throw new Error("HTTP "+res.status);
+      // The cloud copy is gone. The local library stays — signing out never
+      // takes it, and deleting an account should not either. What was deleted
+      // is the account and the backup, which is what the button says.
+      try{if(sb)await sb.auth.signOut();}catch(e){}
+      state.session=null;syncBaseVersion=0;
+      render();
+    }catch(e){
+      console.warn("[auth] delete: "+e);
+      del.disabled=false;del.textContent=t("auth_delete_failed");
+      setTimeout(()=>{const d=document.getElementById("authDelete");if(d)d.textContent=t("auth_delete");},3000);
+    }
+  };
 }
 
 /* ---------------- CLOUD SYNC ---------------- */
