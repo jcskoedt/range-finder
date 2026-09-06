@@ -1473,13 +1473,13 @@ function generatePlan(sportKey,targetKm,weeksAvailable,sessionsPerWeek,currentLo
     const buildCount=weeksAvailable-taperCount;
     for(let w=0;w<buildCount;w++){
       const lk=rnd(startLong+(peak*0.55-startLong)*(buildCount<=1?1:w/(buildCount-1)));
-      weeks.push({phase:t("phase_build"),items:buildItems(lk,{})});
+      weeks.push({phase:t("phase_build"),phaseKey:"BUILD",items:buildItems(lk,{})});
     }
     for(let ti=0;ti<taperCount;ti++){
       const isLast=ti===taperCount-1;
       const lk=rnd(peak*0.55*(1-ti*0.4));
-      if(isLast) weeks.push({phase:t("phase_raceweek"),items:buildItems(lk*0.4,{support:[0.3],isEvent:true})});
-      else weeks.push({phase:t("phase_taper"),items:buildItems(lk,{veryEasy:true})});
+      if(isLast) weeks.push({phase:t("phase_raceweek"),phaseKey:"RACE WEEK",items:buildItems(lk*0.4,{support:[0.3],isEvent:true})});
+      else weeks.push({phase:t("phase_taper"),phaseKey:"TAPER",items:buildItems(lk,{veryEasy:true})});
     }
     return weeks;
   }
@@ -1511,27 +1511,32 @@ function generatePlan(sportKey,targetKm,weeksAvailable,sessionsPerWeek,currentLo
     const posInLoad=loadOrder.indexOf(i);
     const ramp=loadOrder.length<=1?1:posInLoad/(loadOrder.length-1);
     const lk=rnd(startLong+(peak-startLong)*ramp);
-    if(w.isPeak){weeks.push({phase:t("phase_peak"),items:buildItems(peak,{support:supFracs.map(f=>f*0.75),longNote:t("note_longest")})});return;}
-    if(w.type==="recovery"){weeks.push({phase:phaseName(i,numBlocks,leftover)+" · "+t("suffix_recovery"),items:buildItems(rnd(lk*0.55),{})});return;}
-    if(b2bIndices.includes(i)){weeks.push({phase:phaseName(i,numBlocks,leftover)+" · "+t("suffix_b2b"),items:buildItems(lk,{backToBack:true})});return;}
+    const slot=phaseSlot(i,numBlocks,leftover);
+    if(w.isPeak){weeks.push({phase:t("phase_peak"),phaseKey:"PEAK",items:buildItems(peak,{support:supFracs.map(f=>f*0.75),longNote:t("note_longest")})});return;}
+    if(w.type==="recovery"){weeks.push({phase:slot.label+" · "+t("suffix_recovery"),phaseKey:slot.key,items:buildItems(rnd(lk*0.55),{})});return;}
+    if(b2bIndices.includes(i)){weeks.push({phase:slot.label+" · "+t("suffix_b2b"),phaseKey:slot.key,items:buildItems(lk,{backToBack:true})});return;}
     let intervalIdx=null;
     if(posInLoad>=firstIntervalWeekPos){intervalIdx=intervalCounter%scheme.length;intervalCounter++;}
-    weeks.push({phase:phaseName(i,numBlocks,leftover),items:buildItems(lk,{intervalIdx})});
+    weeks.push({phase:slot.label,phaseKey:slot.key,items:buildItems(lk,{intervalIdx})});
   });
   for(let ti=0;ti<taperWeeks;ti++){
     const isLast=ti===taperWeeks-1;
     const lk=rnd(peak*(0.6-0.18*ti));
-    if(isLast) weeks.push({phase:t("phase_raceweek"),items:buildItems(rnd(targetKm*0.12),{support:[0.3],isEvent:true,eventNote:t("note_restup")})});
-    else weeks.push({phase:t("phase_taper"),items:buildItems(lk,{})});
+    if(isLast) weeks.push({phase:t("phase_raceweek"),phaseKey:"RACE WEEK",items:buildItems(rnd(targetKm*0.12),{support:[0.3],isEvent:true,eventNote:t("note_restup")})});
+    else weeks.push({phase:t("phase_taper"),phaseKey:"TAPER",items:buildItems(lk,{})});
   }
   return weeks;
 }
-function phaseName(i,numBlocks,leftover){
-  if(i<leftover) return t("phase_base1");
+// Returns the display label and the canonical phase key together. They must
+// come from the same index math: the label is localized and block-numbered
+// ("Build 2"), the key is what /api/replan validates against.
+function phaseSlot(i,numBlocks,leftover){
+  if(i<leftover) return {label:t("phase_base1"),key:"BASE"};
   const blockIdx=Math.floor((i-leftover)/4);
-  const names=[t("phase_base1"),t("phase_base2"),t("phase_build1"),t("phase_build2"),t("phase_peak")];
-  const scaledIdx=numBlocks<=1?0:Math.floor(blockIdx*(names.length-1)/(numBlocks-1));
-  return names[Math.min(scaledIdx,names.length-1)];
+  const slots=[["phase_base1","BASE"],["phase_base2","BASE"],["phase_build1","BUILD"],["phase_build2","BUILD"],["phase_peak","PEAK"]];
+  const scaledIdx=numBlocks<=1?0:Math.floor(blockIdx*(slots.length-1)/(numBlocks-1));
+  const slot=slots[Math.min(scaledIdx,slots.length-1)];
+  return {label:t(slot[0]),key:slot[1]};
 }
 
 // Whole weeks from today until the race. 0 means "no usable date" — unset,
@@ -1554,7 +1559,7 @@ function weeksUntil(dateStr){
 // sessions back in place. The phases come back unchanged by contract, so only
 // items are replaced — week count, dates and progress keys all stay put.
 async function runReplan(plan,sw){
-  const remaining=sw.remaining.map(i=>({phase:plan.weeks[i].phase,items:plan.weeks[i].items}));
+  const remaining=sw.remaining.map(i=>({phase:canonicalPhase(plan.weeks[i].phaseKey),items:plan.weeks[i].items}));
   try{
     const ctrl=new AbortController();
     const abortTimer=setTimeout(()=>ctrl.abort(),AI_GENERATE_TIMEOUT_MS);
@@ -1807,6 +1812,17 @@ const AI_GENERATE_TIMEOUT_MS=95000;
 // generatePlan() writes localized names. The phase accordion groups weeks by
 // this string, so both paths resolve through the same keys — otherwise a Danish
 // AI plan would show "Race Week" next to a Danish fallback plan's "Løbsuge".
+// The canonical phase set /api/replan validates against. week.phase is a
+// display label — localized, block-numbered, sometimes with a " · restitution"
+// suffix — so it can never be sent back to the API. week.phaseKey carries the
+// key alongside it. Returns null for anything unrecognised, which is how a
+// plan saved before phaseKey existed is detected.
+const CANONICAL_PHASES=["BASE","BUILD","PEAK","TAPER","RACE WEEK"];
+function canonicalPhase(p){
+  const s=String(p==null?"":p).trim().toUpperCase();
+  return CANONICAL_PHASES.includes(s)?s:null;
+}
+
 function apiPhaseName(p){
   const key="api_"+String(p||"").toUpperCase();
   const hit=I18N[lang][key]||I18N.en[key];
@@ -1833,6 +1849,7 @@ function apiPlanToLocalPlan(apiPlan,wiz){
     capped:apiPlan.capped===true,
     weeks:apiPlan.weeks.map(w=>({
       phase:apiPhaseName(w.phase),
+      phaseKey:canonicalPhase(w.phase),
       items:w.items.map(it=>[String(it[0]),Number(it[1]),it[2]||null])
     })),
     progress:{}
@@ -2382,7 +2399,8 @@ function renderPlanView(){
   // Offer a replan once weeks have gone by untouched. Re-asks only if more
   // weeks are skipped after a dismissal, so it cannot nag.
   const sw=skippedWeekInfo(plan);
-  const askReplan=sw.skipped.length>0&&sw.remaining.length>0&&sw.skipped.length>(plan.replanDismissed||0);
+  const replanReady=sw.remaining.every(i=>canonicalPhase(plan.weeks[i]&&plan.weeks[i].phaseKey));
+  const askReplan=sw.skipped.length>0&&sw.remaining.length>0&&sw.skipped.length>(plan.replanDismissed||0)&&replanReady;
   const replanHtml=askReplan?`<div class="replan-card" id="replanCard">
       <div class="replan-text">
         <div class="replan-title">${sw.skipped.length===1?t("replan_title_one"):t("replan_title_many",{n:sw.skipped.length})}</div>
