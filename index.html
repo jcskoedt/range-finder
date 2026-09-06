@@ -1883,6 +1883,21 @@ const INDEX_KEY="plans-index";
 const STORAGE_TIMEOUT_MS=6000;
 function withTimeout(promise,ms,fallback){return Promise.race([promise,new Promise(r=>setTimeout(()=>r(fallback),ms))]);}
 async function loadIndex(){try{const r=await withTimeout(window.storage.get(INDEX_KEY,false),STORAGE_TIMEOUT_MS,null);return r&&r.value?JSON.parse(r.value):[]}catch(e){return[];}}
+
+// Deleting a plan has to leave a trace. Without one, cloud sync has nothing to
+// say "this is gone" with, and the server copy merges straight back in — the
+// plan reappears, the user deletes it again, and it looks like a ghost. Kept
+// even for people who never sign in; it is one unread key.
+const TOMBSTONE_KEY="tombstones";
+async function loadTombstones(){try{const r=await withTimeout(window.storage.get(TOMBSTONE_KEY,false),STORAGE_TIMEOUT_MS,null);return r&&r.value?JSON.parse(r.value):{}}catch(e){return{};}}
+async function addTombstone(id){
+  try{
+    const tomb=await loadTombstones();
+    tomb[id]=new Date().toISOString();
+    await withTimeout(window.storage.set(TOMBSTONE_KEY,JSON.stringify(tomb),false),STORAGE_TIMEOUT_MS,null);
+    return true;
+  }catch(e){storageWarning(e);return false;}
+}
 async function saveIndex(idx){
   try{await withTimeout(window.storage.set(INDEX_KEY,JSON.stringify(idx),false),STORAGE_TIMEOUT_MS,null);return true;}
   catch(e){storageWarning(e);return false;}
@@ -3033,7 +3048,11 @@ function renderTabTal(plan,c){
   let deleteArmed=false;
   document.getElementById("deleteBtn").onclick=async()=>{
     if(deleteArmed){
-      const id=plan.id;state.planIndex=state.planIndex.filter(p=>p.id!==id);
+      const id=plan.id;
+      // Before the plan is gone locally, so a failed write is surfaced while
+      // the plan still exists rather than after it cannot be recovered.
+      await addTombstone(id);
+      state.planIndex=state.planIndex.filter(p=>p.id!==id);
       await saveIndex(state.planIndex);await withTimeout(window.storage.delete("plan-"+id),6000,null);
       delete state.planCache[id];state.activePlan=null;openWeekIdx=null;planTab="today";state.view="library";render();return;
     }
