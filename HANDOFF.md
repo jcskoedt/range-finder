@@ -22,8 +22,11 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Kalender-eksport (.ics) | virker |
 | Sprogskifter DA/EN | hele appen, inkl. AI-output |
 | Valideringsgate | 16/16 |
+| Måling (Vercel Web Analytics) | i koden, **ikke deployet endnu** |
 
 Tilbage: **C** (konti + cloud sync) og en håndfuld mindre punkter — se `TODOS.md`.
+
+Målingen er committet lokalt og venter på to ting: at Web Analytics slås til i Vercel-dashboardet, og et deploy. Før det er der stadig ingen tal.
 
 ---
 
@@ -96,6 +99,25 @@ PEAK_FRACTION        0.8       længste træning ≈ 80% af måldistancen
 
 ---
 
+## Måling
+
+Vercel Web Analytics, cookieless. Shim og script-tag ligger øverst i `<body>`; alle events går gennem `track()` i `index.html`, som er pakket ind i try/catch — en adblocker eller et koldt deploy må aldrig kaste midt i at gemme en plan.
+
+| Event | Data | Hvad det svarer på |
+|---|---|---|
+| `plan_generated` | `source` (ai/algorithm), `sport`, `weeks`, `sessions_per_week`, `lang` | Bliver der overhovedet lavet planer? |
+| `plan_fallback` | `reason` | Hvor tit betales der for AI-output som ingen ser |
+| `session_logged` | `week_idx`, `source` | Gate 0, og AI vs. algoritme over tid |
+| `replan_used` | `weeks_rewritten` | Bruges B2 |
+| `plan_shared` | — | Spredes planer |
+| `plan_exported` | `events` | Virker .ics-eksporten |
+
+`reason` holdes til et lille fast sæt: `timeout`, `http_429`, `plan_too_large`, `http_error`, `network`, `malformed`. Rå statuskoder ville sprøjte engangsværdier ud i dashboardet og svare på ingenting.
+
+Ingen fritekst, ingen km-værdier, ingen datoer, intet id. Der er ikke persondata i det.
+
+To ting der er nemme at få galt og allerede er håndteret: at fjerne et kryds logger ingenting, og log-knappen renderes kun for sessioner der ikke er færdige, så en session kan ikke tælles to gange.
+
 ## Det der kostede tid — læs dette før du ændrer noget
 
 ### Faser skal beregnes i kode, ikke af modellen
@@ -105,6 +127,18 @@ Den oprindelige prompt havde fasetabellen som prosa og lod Claude selv tælle ug
 
 ### Lange planer taber uger
 Over ~100 sessioner (uger × sessioner/uge) returnerer Haiku det forkerte antal uger — `stop_reason: end_turn`, ikke trunkering, og et retry redder det ikke. Derfor `MAX_TOTAL_SESSIONS`. Grænsen går på **sessioner, ikke uger**: 24 uger × 3 virker fint, 17 × 6 gør ikke.
+
+### Legacy `routes` springer filsystemet over — catch-all'en slugte analytics-scriptet
+`vercel.json` bruger `builds` og dermed legacy `routes`, og de tjekker ikke filsystemet af sig selv. Derfor de eksplicitte ruter til `logo.png`, `icon.svg` og resten — og derfor slugte SPA-catch-all'en `/_vercel/insights/script.js` og serverede `index.html` i stedet. Målt før rettelsen: 200, `text/html`, 144661 bytes, præcis som en ukendt sti.
+
+Browseren ville have parset hele SPA'en som JavaScript, og målingen ville aldrig have virket — uden en fejl nogen steder. `{ "handle": "filesystem" }` før catch-all'en løser det. Samme familie som "alle `/api/*` gav 404 siden første commit".
+
+Tjek en platform-sti sådan her, ikke ved at kigge på konfigurationen:
+```bash
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
+  https://rangefinderapp.vercel.app/_vercel/insights/script.js
+```
+HTML betyder at en rute sluger den. De seks eksplicitte statiske ruter er overflødige nu, men står der stadig.
 
 ### Vercel læser ikke `.gitignore`
 Uden `.vercelignore` uploades hele mappen. En 130MB fil i en urelateret mappe væltede et deploy med *"File size limit exceeded (100 MB)"*.
@@ -126,6 +160,8 @@ Screenshot-importen blev engang efterladt uden `wireUploadArea()`, og `api/scan.
 ## Uløste beslutninger
 
 1. **Er AI-planer bedre end algoritme-planer?** CEO-planen stiller spørgsmålet og besvarer det ikke. Der er endnu ikke én rigtig bruger der har gennemført en plan. **Det bør afgøres før C** — C er det dyreste stykke arbejde i planen og svært at rulle tilbage, når der først ligger brugerdata i en database.
+
+   Målingen er nu i koden, men ikke deployet. Når den kører, er `session_logged` delt på `source` det tætteste svar uden at spørge folk: krydser AI-brugere flere sessioner af over flere uger end algoritme-brugere, betyder planen noget. CEO-planens Gate 0 — fem rigtige brugere der laver en plan og logger en session — aflæses på `plan_generated` og `session_logged`.
 2. **Fase-tabellens hul for uge 21-24.** Reglen siger "tilføj 1 BASE-uge, maks 8 BASE-uger totalt", men ikke hvad der sker når loftet er nået og planen skal være længere. Koden forlænger bare BASE videre. Kræver en rigtig coach — en kandidatregel er at forlænge BUILD i stedet, men det er et gæt.
 3. **Sikkerhed ved C.** Implicit auth flow (token i URL-hash) blev accepteret som trade-off for B. Skal genbesøges.
 
@@ -160,7 +196,7 @@ Design-reviewets FINDING-002 (manglende overskriftssemantik) er lukket 2026-09-0
 | `api/scan.js` | Screenshot → aktiviteter |
 | `scripts/validate-generate.mjs` | Prompt-gate, 16 samples, exit 0/1 |
 | `scripts/sweep-plan-length.mjs` | Finder hvor lange planer knækker |
-| `vercel.json` | Routing. Bruger det gamle `builds`-format — `functions` og `builds` udelukker hinanden |
+| `vercel.json` | Routing. Bruger det gamle `builds`-format — `functions` og `builds` udelukker hinanden. `handle: filesystem` skal blive stående før catch-all'en |
 | `.vercelignore` | Vercel læser ikke `.gitignore` |
 | `TODOS.md` | Opgaveliste med begrundelser og fravalg |
 | `CLAUDE.md` | Instruktioner til AI-assistenter i dette repo |

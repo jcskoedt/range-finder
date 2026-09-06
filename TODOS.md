@@ -5,9 +5,23 @@ B1 (AI-plangenerering) og B2 (replan) er færdige og i produktion. Se `HANDOFF.m
 
 ---
 
+## Lige nu: få tal på bordet
+
+Målingen er bygget og committet lokalt (se Færdigt). Den mangler to ting for at give noget:
+
+- [ ] **Slå Web Analytics til** i Vercel-dashboardet. Toggle'en viser samtidig event-loftet på planen.
+- [ ] **Deploy.** Målingen kan først verificeres i produktion.
+- [ ] **Verificér efter deploy:** `curl -s -o /dev/null -w "%{http_code} %{content_type}\n" https://rangefinderapp.vercel.app/_vercel/insights/script.js` skal give JavaScript, ikke HTML. Generér så en plan live og se eventet lande.
+- [ ] **Del linket med fem rigtige folk.** Det er CEO-planens Gate 0, og det er stadig ikke gjort.
+- [ ] `replan_used` er det eneste event der ikke er testet — det kræver API'et og sprungne uger.
+
+---
+
 ## Næste større stykke: C — konti og cloud sync
 
 **Afgør dette først:** CEO-planen spørger om AI-planer beviseligt er bedre end algoritme-planer, og svarer ikke. Der er endnu ikke én rigtig bruger der har gennemført en plan. C er det dyreste stykke arbejde i planen og svært at rulle tilbage når der først ligger brugerdata i en database — så spørgsmålet bør besvares før, ikke efter.
+
+Målingen er nu på plads til at besvare det. Den skal bare deployes og køre længe nok.
 
 C bringer også ting ind som ikke er tekniske: persondata gør dig til databehandler (GDPR, sletning, privatlivspolitik), og implicit auth flow (token i URL-hash) blev accepteret som trade-off for B og skal genbesøges.
 
@@ -45,6 +59,12 @@ C bringer også ting ind som ikke er tekniske: persondata gør dig til databehan
 ---
 
 ## Færdigt
+
+### Måling (2026-09-06)
+- Seks Vercel Web Analytics-events: `plan_generated`, `plan_fallback`, `session_logged`, `replan_used`, `plan_shared`, `plan_exported`. Cookieless, anonyme, ingen persondata. Se `HANDOFF.md` for tabellen
+- **`vercel.json` skulle rettes først:** legacy `routes` springer filsystemet over, så SPA-catch-all'en slugte `/_vercel/insights/script.js` og serverede `index.html` (målt: 200, `text/html`, 144661 bytes). Uden `handle: filesystem` ville browseren have parset SPA'en som JavaScript og målingen aldrig virket, uden en fejl nogen steder
+- `plan_fallback.reason` har også en pengevinkel: når `validatePlan()` afviser et svar, er der allerede betalt for de output-tokens, prøvet igen, og serveret algoritme-planen. Det var usynligt før
+- Verificeret lokalt gennem wizarden: alle events fyrer med de rigtige payloads, et fjernet kryds logger ingenting, og log-knappen renderes kun for sessioner der ikke er færdige
 
 ### B1 — AI-plangenerering (2026-09-04 → 05)
 - `api/generate.js`: fase-allokering i kode, sport-aliaser, `target_km`, `sessions_per_week`, sprogvariant, sessions-cap, rate limit
