@@ -182,7 +182,17 @@ Design-reviewets FINDING-002 (manglende overskriftssemantik) er lukket 2026-09-0
 
 ## Arbejdsgang
 
-**Alt laves og committes lokalt. Der pushes og deployes kun når Jacob eksplicit siger til.** Se `CLAUDE.md`.
+**Alt laves og committes lokalt. Der pushes og deployes kun når Jacob eksplicit siger til.**
+
+**Koster noget mere end $0,24 i API-credits, så spørg først** — antal kald, model, beløb. Under grænsen: kør bare, og nævn prisen bagefter. Tællingen er kumulativ inden for en opgave.
+
+| | Pris | Kræver ja? |
+|---|---|---|
+| `scripts/validate-generate.mjs` | $0,25 | **ja** |
+| `scripts/sweep-plan-length.mjs` | $0,45 | **ja** |
+| Én plan mod `/api/generate` | $0,01 | nej |
+
+Kald der afvises før modellen (400, 422, 429) og alt mod den lokale stub-server koster ingenting. Begge regler står uddybet i `CLAUDE.md`.
 
 ---
 
