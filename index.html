@@ -1016,6 +1016,10 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
 <script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments);};</script>
 <script defer src="/_vercel/insights/script.js"></script>
 
+<!-- Supabase Auth. No build step here, so the UMD bundle comes from CDN and
+     has to load before the app script uses window.supabase. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
 <div class="lang-toggle" id="langToggle">
   <button type="button" data-lang="da">DA</button>
   <button type="button" data-lang="en">EN</button>
@@ -1091,6 +1095,10 @@ en:{
   notice_too_large:"A plan that long is better handled by our own algorithm than by the AI coach — so that is what this one is.",
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
   share_plan:"Share this plan", export_ical:"Add to calendar (.ics)",
+  auth_save_title:"Keep this plan safe", auth_save_body:"It only lives in this browser. Sign in and it is backed up too.",
+  auth_email_ph:"you@email.com", auth_send:"Send sign-in link", auth_sent:"Check your inbox.",
+  auth_failed:"Could not send the link. Try again.", auth_signout:"Sign out", auth_signed_in:"Signed in as {email}",
+  sync_saved:"Backed up", sync_saving:"Saving", sync_pending:"Not saved yet",
   export_ical_done_one:"1 session downloaded — open the file to add it to your calendar.",
   export_ical_done_many:"{n} sessions downloaded — open the file to add them to your calendar.",
   export_ical_none:"This plan has no dates to export.", share_copied:"Link copied — paste it wherever you like.",
@@ -1244,6 +1252,10 @@ da:{
   notice_too_large:"Så lang en plan laver vores egen algoritme bedre end AI-coachen — så det er den, du får her.",
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
   share_plan:"Del denne plan", export_ical:"Læg i kalender (.ics)",
+  auth_save_title:"Gem din plan", auth_save_body:"Den ligger kun i denne browser. Log ind, så gemmes den også i skyen.",
+  auth_email_ph:"din@email.dk", auth_send:"Send login-link", auth_sent:"Tjek din indbakke.",
+  auth_failed:"Linket kunne ikke sendes. Prøv igen.", auth_signout:"Log ud", auth_signed_in:"Logget ind som {email}",
+  sync_saved:"Gemt i skyen", sync_saving:"Gemmer", sync_pending:"Ikke gemt endnu",
   export_ical_done_one:"1 træning hentet — åbn filen for at lægge den i din kalender.",
   export_ical_done_many:"{n} træninger hentet — åbn filen for at lægge dem i din kalender.",
   export_ical_none:"Denne plan har ingen datoer at eksportere.", share_copied:"Link kopieret — sæt det ind hvor du vil.",
@@ -1877,6 +1889,45 @@ function apiPlanToLocalPlan(apiPlan,wiz){
 // Nothing here identifies anyone: no free text, no km values, no dates, no id.
 function track(name,data){try{if(window.va)window.va("event",{name:name,data:data});}catch(e){}}
 
+/* ---------------- AUTH ---------------- */
+// Sign-in is optional and always will be: the app works with no account, and
+// logging in only adds a backup. Everything here degrades to a no-op when the
+// CDN bundle is blocked, so an adblocker cannot stop someone using the app.
+const SUPABASE_URL="https://pxbrkdymegmizyvaqude.supabase.co";
+// Public by design. This key identifies the project, it does not grant access —
+// row level security does that. The service role key is the secret one and it
+// lives only in Vercel, never here.
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4YnJrZHltZWdtaXp5dmFxdWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2OTk0MzYsImV4cCI6MjEwNDI3NTQzNn0.8oCSNygf0fXbQQT8u8LS77c8-QrhaetWHR4X5mHIggA";
+
+let sb=null;
+try{
+  if(window.supabase&&window.supabase.createClient){
+    sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
+      // The token arrives in the URL hash (implicit flow). index.html is served
+      // with Cache-Control: no-store so a cached page carrying one cannot reach
+      // another browser — see vercel.json.
+      auth:{detectSessionInUrl:true,persistSession:true}
+    });
+  }
+}catch(e){console.warn("[auth] "+e);}
+
+async function signIn(email){
+  if(!sb)return false;
+  try{
+    const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
+    if(error)console.warn("[auth] "+error.message);
+    return !error;
+  }catch(e){console.warn("[auth] "+e);return false;}
+}
+
+// Signing out stops the backup and leaves the library where it is. On a shared
+// computer that means the plans stay behind — a deliberate trade in favour of
+// not losing training, decided in the design conversation.
+async function signOut(){
+  try{if(sb)await sb.auth.signOut();}catch(e){console.warn("[auth] "+e);}
+  state.session=null;render();
+}
+
 /* ---------------- FREMDRIFT ---------------- */
 // Cloud sync afgør konflikter på hvornår en post blev skrevet. Uden det kan to
 // browsere ikke skilles ad: "krydset af på telefonen søndag" ser ud præcis som
@@ -1963,7 +2014,7 @@ function isFuture(d){
 
 /* ---------------- STATE ---------------- */
 let sharedPlan=null; // a plan decoded from ?p= on this page load
-let state={view:"library",planIndex:[],activePlan:null,wizardSport:"cykling",wizardFitness:"Motionist",wizardRaceDate:"",planCache:{}};
+let state={view:"library",planIndex:[],activePlan:null,wizardSport:"cykling",wizardFitness:"Motionist",wizardRaceDate:"",planCache:{},session:null,syncState:"saved"};
 const app=document.getElementById("app");
 
 /* ---------------- LIBRARY ---------------- */
@@ -3147,6 +3198,16 @@ function render(){
   syncLangToggle();
   document.documentElement.lang=lang;
   renderLibrary(true);
+  if(sb){
+    try{
+      const {data}=await sb.auth.getSession();
+      state.session=(data&&data.session)||null;
+    }catch(e){console.warn("[auth] "+e);}
+    sb.auth.onAuthStateChange((_e,session)=>{
+      state.session=session||null;
+      render();
+    });
+  }
   sharedPlan=await readSharedPlan();
   state.planIndex=await loadIndex();
   if(state.view==="library")renderLibrary(false);
