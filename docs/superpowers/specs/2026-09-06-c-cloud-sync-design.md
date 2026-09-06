@@ -135,7 +135,7 @@ Fletningen er den ene ting i C der kan tabe data i stilhed. Den ligger derfor se
 
 ```
 merge(server, client):
-  tombstones = union(server.tombstones, client.tombstones)   // tidligste dato vinder
+  tombstones = union(server.tombstones, client.tombstones)   // SENESTE dato vinder
   plans = {}
   for id in union(server.plans, client.plans):
     if id in tombstones: continue                            // sletning er endelig
@@ -162,7 +162,11 @@ En post uden `at`, eller med en uparselig værdi, giver 0 og taber dermed altid 
 
 **Sletning slår alt.** Er et id i `tombstones` på blot én af siderne, findes planen ikke i resultatet — også hvis den anden side har nyere fremdrift. Det følger direkte af beslutning 5, og det er prisen for at planer ikke genopstår som spøgelser.
 
-**Tombstones ryddes efter 12 måneder.** De er få dusin bytes hver, men skal ikke vokse uendeligt. Efter 12 måneder kan ingen enhed rimeligvis stadig ligge med en usynkroniseret kopi, og inaktive konti er alligevel slettet på det tidspunkt.
+**Seneste dato vinder, ikke tidligste.** Rettet 2026-09-06 efter en adversarisk gennemgang. Tidligste-vinder så symmetrisk ud med fremdriftsreglen og var forkert: den valgte den ældste af to datoer, hvorefter udløbet fjernede den. Målt før rettelsen gav `{a: i går}` flettet med `{a: 2024}` resultatet `{}` — begge sider var enige om at planen var slettet, og fletningen returnerede ingen sletning. En tombstones eneste opgave er at overleve, og så er seneste-vinder den rigtige regel.
+
+**Tombstones ryddes efter 12 måneder, men kun når ingen side stadig har planen.** De er få dusin bytes hver og skal ikke vokse uendeligt. Men udløbet må ikke fjerne en tombstone der stadig gør arbejde: ligger en enhed der har været stille i 13 måneder med kopien, og er tombstonen udløbet, kommer planen tilbage. Begrundelsen for et rent tidsudløb var at inaktive konti alligevel slettes efter 12 måneder — men opbevaringen tælles pr. **konto** og opdateres af enhver enhed, mens udløbet skulle bruges som mål for hvor gammel en enkelt **enhed** er. En konto holdt i live af en telefon i daglig brug plus en laptop urørt i 13 måneder er det almindelige tilfælde.
+
+Derfor sker pruningen i `merge()`, som er det eneste sted der ved om nogen stadig bærer planen — ikke i `mergeTombstones()`. En tombstone med ulæselig dato beholdes af samme grund.
 
 **Klienten skal begynde at føre tombstones lokalt.** I dag fjerner sletning blot planen fra `plans-index` og sletter `plan-<id>`; der efterlades intet spor. Uden et lokalt spor kan klienten ikke fortælle serveren at planen er slettet, og serverens kopi ville blive flettet tilbage ved næste synkronisering — netop den spøgelsesadfærd beslutning 5 findes for at undgå. Sletning skal derfor skrive `{id: slettetTidspunkt}` i en lokal `tombstones`-nøgle, som følger med i `doc` ved synkronisering. Det gælder også for brugere der aldrig logger ind; de bærer bare en nøgle ingen læser.
 

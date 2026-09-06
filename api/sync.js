@@ -46,34 +46,54 @@ export function mergeProgress(a = {}, b = {}) {
   return out;
 }
 
-export function mergeTombstones(a = {}, b = {}, now = Date.now()) {
+// Latest wins, and nothing is pruned here. Both of those are corrections.
+//
+// Earliest-wins looked symmetrical with the progress rule and was wrong: a
+// tombstone's only job is to persist, so picking the older of two dates and
+// then expiring it deleted the record while both sides still agreed the plan
+// was gone. Measured: {a: yesterday} merged with {a: 2024} returned {}.
+//
+// Expiry moved to merge(), which is the only place that knows whether anyone
+// still holds the plan. A tombstone must never expire while there is something
+// left to resurrect.
+export function mergeTombstones(a = {}, b = {}) {
   const out = {};
   for (const id of new Set([...keysOf(a), ...keysOf(b)])) {
-    // ISO 8601 strings sort lexically in chronological order, so the earliest
+    // ISO 8601 strings sort lexically in chronological order, so the latest
     // deletion wins without parsing either of them.
-    const at = [a && a[id], b && b[id]].filter(Boolean).sort()[0];
-    if (!at) continue;
-    const parsed = Date.parse(at);
-    // A tombstone with an unreadable date is kept rather than dropped: losing
-    // it would let the plan come back, which is the worse of the two failures.
-    if (!Number.isFinite(parsed) || now - parsed < TOMBSTONE_TTL_MS) out[id] = at;
+    const dates = [a && a[id], b && b[id]].filter(Boolean).sort();
+    if (dates.length) out[id] = dates[dates.length - 1];
   }
   return out;
 }
 
 export function merge(server, client, now = Date.now()) {
-  const tombstones = mergeTombstones(server && server.tombstones, client && client.tombstones, now);
+  const all = mergeTombstones(server && server.tombstones, client && client.tombstones);
   const sp = (server && server.plans) || {};
   const cp = (client && client.plans) || {};
+
   const plans = {};
   for (const id of new Set([...keysOf(sp), ...keysOf(cp)])) {
-    if (tombstones[id]) continue;               // deletion is final everywhere
+    if (all[id]) continue;                      // deletion is final everywhere
     const s = sp[id], c = cp[id];
     if (!s) { plans[id] = c; continue; }
     if (!c) { plans[id] = s; continue; }
     const base = upd(c) > upd(s) ? c : s;
     plans[id] = { ...base, progress: mergeProgress(s.progress, c.progress) };
   }
+
+  // Expiry happens last, and only for plans nobody is still carrying. A
+  // tombstone that is still doing work — killing a copy on the other side —
+  // outlives its TTL rather than letting the plan come back. An unreadable
+  // date is kept for the same reason.
+  const tombstones = {};
+  for (const id of keysOf(all)) {
+    const parsed = Date.parse(all[id]);
+    const stillHeld = Boolean(sp[id] || cp[id]);
+    const expired = Number.isFinite(parsed) && now - parsed >= TOMBSTONE_TTL_MS;
+    if (stillHeld || !expired) tombstones[id] = all[id];
+  }
+
   return { v: DOC_VERSION, plans, tombstones };
 }
 

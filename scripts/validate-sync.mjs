@@ -56,16 +56,28 @@ eq("4. poster kun på én side bevares",
 
 console.log("\ntombstones — sletning er endelig");
 
-eq("5. tidligste sletning vinder",
+// Seneste vinder, ikke tidligste. En tombstones eneste opgave er at overleve,
+// og tidligste-vinder valgte den ældste dato og lod udløbet fjerne den — så
+// forsvandt sletningen selv om begge sider var enige om den.
+eq("5. seneste sletning vinder",
   mergeTombstones({ a: "2026-09-05T00:00:00.000Z" }, { a: "2026-09-06T00:00:00.000Z" }, NOW),
+  { a: "2026-09-06T00:00:00.000Z" });
+
+eq("5b. en gammel dato på den ene side ødelægger ikke en gyldig sletning",
+  mergeTombstones({ a: "2026-09-05T00:00:00.000Z" }, { a: "2024-09-06T00:00:00.000Z" }, NOW),
   { a: "2026-09-05T00:00:00.000Z" });
 
-eq("6. tombstone ældre end 12 mdr ryddes",
-  mergeTombstones({ a: iso(NOW - TOMBSTONE_TTL_MS - 1000) }, {}, NOW),
+// Udløbet ryddes i merge(), ikke i mergeTombstones(), fordi kun merge() ved om
+// nogen stadig ligger med planen. En tombstone må aldrig ryddes mens der er
+// noget tilbage at genoplive.
+eq("6. tombstone ældre end 12 mdr ryddes når ingen har planen",
+  merge({ plans: {}, tombstones: { a: iso(NOW - TOMBSTONE_TTL_MS - 1000) } },
+        { plans: {}, tombstones: {} }, NOW).tombstones,
   {});
 
 eq("6b. tombstone lige under 12 mdr bevares",
-  mergeTombstones({ a: iso(NOW - TOMBSTONE_TTL_MS + 60000) }, {}, NOW),
+  merge({ plans: {}, tombstones: { a: iso(NOW - TOMBSTONE_TTL_MS + 60000) } },
+        { plans: {}, tombstones: {} }, NOW).tombstones,
   { a: iso(NOW - TOMBSTONE_TTL_MS + 60000) });
 
 console.log("\nplaner");
@@ -114,6 +126,31 @@ eq("11. en uge ude af sync, begge sider har ændringer",
         "0_2": p("2026-09-03T00:00:00.000Z"), "1_0": p("2026-09-04T00:00:00.000Z") }) }, tombstones: {} },
     NOW).plans.a.progress).sort(),
   ["0_0", "0_1", "0_2", "1_0"]);
+
+// Formen som planer gemt før updatedAt fandtes faktisk har. Uden en test for
+// den beviste gaten kun noget om dokumenter ingen havde.
+eq("14. ingen updatedAt nogen steder — serveren vinder, deterministisk",
+  merge(
+    { plans: { a: { id: "a", weeks: ["SERVER"], progress: {} } }, tombstones: {} },
+    { plans: { a: { id: "a", weeks: ["KLIENT"], progress: {} } }, tombstones: {} },
+    NOW).plans.a.weeks,
+  ["SERVER"]);
+
+eq("15. updatedAt kun på klienten — klienten vinder",
+  merge(
+    { plans: { a: { id: "a", weeks: ["SERVER"], progress: {} } }, tombstones: {} },
+    { plans: { a: { id: "a", updatedAt: "2026-09-05T00:00:00.000Z", weeks: ["KLIENT"], progress: {} } }, tombstones: {} },
+    NOW).plans.a.weeks,
+  ["KLIENT"]);
+
+// En slettet plan må ikke genopstå fordi tombstonen er udløbet mens en anden
+// enhed stadig ligger med kopien.
+eq("16. udløbet tombstone mod en levende plan",
+  Object.keys(merge(
+    { plans: {}, tombstones: { a: iso(NOW - TOMBSTONE_TTL_MS - 1000) } },
+    { plans: { a: plan("a", "2026-09-01T00:00:00.000Z") }, tombstones: {} },
+    NOW).plans),
+  []);
 
 console.log("\nrobusthed");
 
