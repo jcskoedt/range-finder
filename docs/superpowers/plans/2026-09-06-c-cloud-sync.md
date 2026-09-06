@@ -15,7 +15,7 @@
 - **Intet build-trin.** `index.html` serveres råt. Alle biblioteker hentes fra CDN med `<script src>`; bare specifiers (`import x from "pkg"`) virker ikke i browseren.
 - **Ét sprog ad gangen.** Alle brugervendte strenge skal ind i `I18N`-objektet med både `da`- og `en`-variant. Ingen hardkodede strenge i markup.
 - **Struktur i kode, indhold fra modellen.** Projektets bærende regel. Her betyder den: fletningen er deterministisk kode, aldrig en heuristik.
-- **Testbar uden browser.** Fletningen skal kunne importeres af et `.mjs`-script uden env-variabler. Supabase-klienten oprettes derfor **inde i handleren**, aldrig på modulniveau — modsat `api/generate.js`, hvor Anthropic-klienten ligger på modulniveau og tvinger `validate-generate.mjs` til at sætte en dummy-nøgle.
+- **Testbar uden browser.** Fletningen skal kunne importeres af et `.mjs`-script uden env-variabler. Supabase-klienten oprettes derfor **inde i handleren**, aldrig på modulniveau. Verificér med `env -i node --input-type=module -e "import('.../api/sync.js')"` — en gate som en urelateret afhængighedsopgradering kan knække, er ikke en gate. (`api/generate.js` har sin klient på modulniveau og importerer alligevel uden nøgle, fordi Anthropic-SDK'en først kaster ved kald. Det er held, ikke design, og det bør ikke kopieres.)
 - **Alt lokalt først.** Der pushes og deployes kun når Jacob eksplicit siger til. Commits lokalt er fint.
 - **`vercel.json` er skrøbelig.** Den har fejlet to gange på ét døgn. Verificér altid med `curl -I` mod produktion, aldrig ved at læse konfigurationen.
 - **Sport-nøgler er ASCII:** `cykling` / `lob` / `svomning`.
