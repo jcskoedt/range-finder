@@ -8,9 +8,9 @@ Design, 2026-09-06. Afløser C-afsnittet i CEO-planen (`~/.gstack/projects/traen
 
 **Planen må ikke gå tabt.** I dag bor hele biblioteket i browserens localStorage. Rydder nogen deres browserdata, bruger et privat vindue, eller skifter maskine, er tyve ugers træning væk uden varsel.
 
-Det er den eneste begrundelse for C. Ikke flere enheder, ikke email-kontakt, ikke betaling. Flere enheder bliver muligt som en sidegevinst, men det er ikke det problem der løses.
+Det er den eneste begrundelse for **denne** udgave af C. Ikke flere enheder, ikke email-kontakt, ikke betaling — ikke fordi de er fravalgt, men fordi de ikke er det der skal bære designet. Flere enheder bliver muligt som en sidegevinst. Resten står under *Senere, ikke nu*.
 
-CEO-planens C var bygget op om $9/md og en free tier-gate. Begge dele udgår, og dermed også den gate. Det er værd at vide når man læser den plan.
+CEO-planens C var bygget op om $9/md og en free tier-gate. Begge dele er ude af denne udgave, og gaten gav kun mening sammen med abonnementet. Det er værd at vide når man læser den plan.
 
 ## Beslutninger
 
@@ -31,13 +31,19 @@ Ti beslutninger truffet i designsamtalen 2026-09-06. De er bindende for det her 
 
 Beslutning 7 gik imod anbefalingen i samtalen. PKCE blev fravalgt til fordel for det simplere flow. Følgen står under *Auth*.
 
-## Ikke i scope
+## Senere, ikke nu
 
-- Betaling og abonnement
-- Deling af planer mellem konti
-- Flere enheder som et markedsført formål — det virker, men er ikke det der bygges efter
-- Ugentlig coaching-email. Kræver C, kommer efter
-- Strava. Uafhængigt, uger af OAuth-review
+Det følgende er **udskudt, ikke fravalgt**. Det hører til produktet, men ikke til første udgave af C. Skelnen er vigtig: der er ingen af punkterne her man skal argumentere for at få lov til at bygge senere — de skal bare ikke bygges nu, og designet ovenfor må ikke spærre for dem.
+
+| Senere | Afhænger af | Bemærk |
+|---|---|---|
+| Betaling og abonnement | C | CEO-planen havde $9/md og en free tier-gate. Begge dele er taget ud af *denne* udgave, og gaten skal genopfindes hvis betaling kommer tilbage — den eksisterede kun for at understøtte abonnementet |
+| Ugentlig coaching-email | C og Resend | Resend er allerede en forudsætning for magic link, så infrastrukturen findes når C er færdig |
+| Deling af planer mellem konti | C | Delelinket i dag er kontoløst og bærer ikke fremdrift. En kontobaseret deling er en anden funktion, ikke en udvidelse af den |
+| Flere enheder som markedsført formål | C | Virker som sidegevinst fra dag ét. Det der mangler er ikke kode, men at turde love det — og det kræver at synkroniseringen har kørt hos rigtige brugere først |
+| Strava-integration | Ingenting | Uafhængig af C og kan startes når som helst. Uger af OAuth-review hos Strava, så ventetiden er det dyre, ikke koden |
+
+Designet ovenfor er valgt så ingen af dem bliver sværere senere. Ét dokument pr. bruger betyder at en betalings- eller delingsfunktion tilføjer felter frem for tabeller, og at et abonnements-flag er én kolonne.
 
 ---
 
