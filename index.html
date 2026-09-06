@@ -7,16 +7,88 @@
 <meta name="description" content="Build a training plan tailored to your sport, your goal, and your timeline.">
 <meta name="theme-color" content="#F5E642">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23F5E642'/><text y='.9em' font-size='80' x='10'>⬛</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700&family=Turret+Road:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/* Self-hosted. Google Fonts sends every visitor IP to Google, which a Munich
+   court found to be a GDPR problem in 2022, and it is avoidable: these are the
+   same OFL-licensed files, served from our own origin.
+   Inter is the variable 200-700 cut, one file per subset instead of six.
+   latin-ext only loads for text that needs it, so a Danish page pays for
+   latin alone. */
+@font-face{
+  font-family:"Inter";
+  font-style:normal;
+  font-weight:200 700;
+  font-display:swap;
+  src:url(/fonts/inter-200-700-latin-ext.woff2) format("woff2");
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face{
+  font-family:"Inter";
+  font-style:normal;
+  font-weight:200 700;
+  font-display:swap;
+  src:url(/fonts/inter-200-700-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face{
+  font-family:"Turret Road";
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+  src:url(/fonts/turret-road-400-latin-ext.woff2) format("woff2");
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face{
+  font-family:"Turret Road";
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+  src:url(/fonts/turret-road-400-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face{
+  font-family:"Turret Road";
+  font-style:normal;
+  font-weight:700;
+  font-display:swap;
+  src:url(/fonts/turret-road-700-latin-ext.woff2) format("woff2");
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face{
+  font-family:"Turret Road";
+  font-style:normal;
+  font-weight:700;
+  font-display:swap;
+  src:url(/fonts/turret-road-700-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face{
+  font-family:"Turret Road";
+  font-style:normal;
+  font-weight:800;
+  font-display:swap;
+  src:url(/fonts/turret-road-800-latin-ext.woff2) format("woff2");
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face{
+  font-family:"Turret Road";
+  font-style:normal;
+  font-weight:800;
+  font-display:swap;
+  src:url(/fonts/turret-road-800-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
 <style>
 :root{
   --bg:#FFFFFF;
   --yellow:#F5E642;
   --red:#CC2020;
   --text:#0A0A0A;
-  --subtle:#777;
+  /* #777 measures 4.48:1 on white — just under the 4.5 WCAG AA needs for
+     normal text, and this colour carries 64 labels, coach notes and hints.
+     #767676 is 4.54:1 and indistinguishable by eye. */
+  --subtle:#767676;
   --border:#0A0A0A;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -706,6 +778,7 @@ body{
   font-size:18px;line-height:1;color:var(--subtle);cursor:pointer;padding:4px;
 }
 .auth-who{font-size:12px;color:var(--subtle);}
+.auth-consent{font-size:11.5px;color:var(--subtle);line-height:1.5;max-width:46ch;}
 .sync-badge{
   position:fixed;bottom:22px;left:16px;z-index:50;
   font-size:10px;font-weight:200;letter-spacing:0.1em;text-transform:uppercase;
@@ -1122,6 +1195,7 @@ en:{
   auth_save_title:"Keep this plan safe", auth_save_body:"It only lives in this browser. Sign in and it is backed up too.",
   auth_email_ph:"you@email.com", auth_send:"Send sign-in link", auth_sent:"Check your inbox.",
   auth_failed:"Could not send the link. Try again.", auth_signout:"Sign out", auth_signed_in:"Signed in as {email}",
+  auth_consent:"Your address is used for one thing: sending you a sign-in link. Your plans and progress are stored so you can get them back. Nothing else, and no marketing.",
   sync_saved:"Backed up", sync_saving:"Saving", sync_pending:"Not saved yet",
   export_ical_done_one:"1 session downloaded — open the file to add it to your calendar.",
   export_ical_done_many:"{n} sessions downloaded — open the file to add them to your calendar.",
@@ -1279,6 +1353,7 @@ da:{
   auth_save_title:"Gem din plan", auth_save_body:"Den ligger kun i denne browser. Log ind, så gemmes den også i skyen.",
   auth_email_ph:"din@email.dk", auth_send:"Send login-link", auth_sent:"Tjek din indbakke.",
   auth_failed:"Linket kunne ikke sendes. Prøv igen.", auth_signout:"Log ud", auth_signed_in:"Logget ind som {email}",
+  auth_consent:"Din adresse bruges til én ting: at sende dig et login-link. Dine planer og din fremdrift gemmes, så du kan få dem igen. Ikke andet, og ingen markedsføring.",
   sync_saved:"Gemt i skyen", sync_saving:"Gemmer", sync_pending:"Ikke gemt endnu",
   export_ical_done_one:"1 træning hentet — åbn filen for at lægge den i din kalender.",
   export_ical_done_many:"{n} træninger hentet — åbn filen for at lægge dem i din kalender.",
@@ -1975,6 +2050,7 @@ function authBoxHtml(){
       <input type="email" id="authEmail" placeholder="${t("auth_email_ph")}" autocomplete="email">
       <button class="btn btn-outline" id="authSend">${t("auth_send")}</button>
     </div>
+    <div class="auth-consent">${t("auth_consent")}</div>
   </div>`;
 }
 
