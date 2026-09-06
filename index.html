@@ -939,7 +939,13 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
   display:grid;grid-template-columns:1fr 1fr;
   border:2px solid var(--border);margin:24px 24px 0;
 }
-.tal-stat{padding:20px 16px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+.tal-stat{padding:20px 16px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+  /* dt must come first in the DOM for a valid <dl>; the number still reads
+     first visually. column-reverse does that without reordering the markup. */
+  display:flex;flex-direction:column-reverse;}
+/* Only the user-agent indent needs clearing. margin:0 here would also
+   beat .tal-num margin-bottom on specificity and shrink every tile by 4px. */
+.tal-grid dd{margin-inline-start:0;}
 .tal-stat:nth-child(2n){border-right:none;}
 .tal-stat:nth-child(3),.tal-stat:nth-child(4){border-bottom:none;}
 .tal-num{font-family:'Turret Road',sans-serif;font-size:28px;font-weight:700;line-height:1;margin-bottom:4px;}
@@ -2952,12 +2958,12 @@ function renderTabTal(plan,c){
     return`<div class="phase-bar-item"><div class="phase-bar-header"><span>${name}</span><span>${fmtKm(d.done)}/${fmtKm(d.total)} km · ${pct}%</span></div><div class="phase-bar-track"><div class="phase-bar-fill" style="width:${pct}%"></div></div></div>`;
   }).join("");
 
-  c.innerHTML=`<div class="tal-grid">
-    <div class="tal-stat"><div class="tal-num">${fmtKm(s.doneKm)}</div><div class="tal-lbl">${t("stat_km")}</div></div>
-    <div class="tal-stat"><div class="tal-num">${s.doneSessions}</div><div class="tal-lbl">${t("stat_sessions")}</div></div>
-    <div class="tal-stat"><div class="tal-num">${fmtKm(longestKm)}</div><div class="tal-lbl">${t("stat_longest")}</div></div>
-    <div class="tal-stat"><div class="tal-num">${weeksToEvent}</div><div class="tal-lbl">${t("stat_weeks_left")}</div></div>
-  </div>
+  c.innerHTML=`<dl class="tal-grid">
+    <div class="tal-stat"><dt class="tal-lbl">${t("stat_km")}</dt><dd class="tal-num">${fmtKm(s.doneKm)}</dd></div>
+    <div class="tal-stat"><dt class="tal-lbl">${t("stat_sessions")}</dt><dd class="tal-num">${s.doneSessions}</dd></div>
+    <div class="tal-stat"><dt class="tal-lbl">${t("stat_longest")}</dt><dd class="tal-num">${fmtKm(longestKm)}</dd></div>
+    <div class="tal-stat"><dt class="tal-lbl">${t("stat_weeks_left")}</dt><dd class="tal-num">${weeksToEvent}</dd></div>
+  </dl>
   <div class="chart-section">
     <h2 class="chart-label">${t("stat_km_week")}</h2>
     <svg width="100%" viewBox="0 0 ${cW} ${cH}" preserveAspectRatio="none" style="display:block;">${bars}</svg>
