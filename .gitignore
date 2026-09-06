@@ -1,6 +1,9 @@
 node_modules/
+# vercel env pull skriver .env.development.local — som .env.local IKKE dækker.
+# Uden den her linje ville en pull lægge service-nøglen i et sporet filnavn.
 .env
-.env.local
+.env*.local
+.env.development.local
 .vercel
 .design-audit/
 .gstack/
