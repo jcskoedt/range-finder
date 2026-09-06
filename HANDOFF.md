@@ -3,9 +3,9 @@ Sidst opdateret: 2026-09-06
 
 ## Hvad det er
 
-En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, måldistance, niveau og enten et antal uger eller en løbsdato; Claude Haiku genererer en plan med faser, sessioner og coach-noter. Planen bor i browserens localStorage. Ingen konti, ingen server-database.
+En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, måldistance, niveau og enten et antal uger eller en løbsdato; Claude Haiku genererer en plan med faser, sessioner og coach-noter. Planen bor i browserens localStorage. Login er valgfrit: uden konto forlader planerne aldrig browseren, med konto spejles hele biblioteket til Supabase.
 
-**Single-file SPA** — hele frontenden er `index.html` (3114 linjer, inkl. CSS og JS). Tre Vercel-funktioner i `api/`.
+**Single-file SPA** — hele frontenden er `index.html` (3567 linjer, inkl. CSS og JS). Fire Vercel-funktioner i `api/`.
 
 ---
 
@@ -23,7 +23,10 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Sprogskifter DA/EN | hele appen, inkl. AI-output |
 | Valideringsgate | 16/16 |
 | Måling (Vercel Web Analytics) | virker, verificeret i produktion 2026-09-06 |
-| Cloud sync (valgfrit login) | virker, deployet 2026-09-06 — fletning ubekræftet med to rigtige browsere |
+| Cloud sync (valgfrit login) | virker, **verificeret mod produktionsdatabasen** 2026-09-06 |
+| Privatlivspolitik | live på `/privacy`, med rigtige selskabsoplysninger |
+| Slet min konto | virker, verificeret: 204 og rækken væk via cascade |
+| Skrifttyper | selvhostet, ingen Google i anmodningskæden |
 
 Tilbage: **C** (konti + cloud sync) og en håndfuld mindre punkter — se `TODOS.md`.
 
@@ -137,6 +140,23 @@ Valgfrit login. localStorage er stadig det primære lager og skrives altid førs
 
 **Migrering er ingen kode.** Første login er den første synkronisering mod et tomt dokument.
 
+### Verificeret mod produktionsdatabasen 2026-09-06
+
+Ikke med stub, men med to rigtige klienter mod den rigtige database:
+
+| Trin | Resultat |
+|---|---|
+| Enhed A krydser `0_0` af og synkroniserer | version 3 |
+| Enhed B sender `0_1` med **forældet** version 2 | serveren tvinges ned i fletningen |
+| Fletning | `["0_0","0_1"]` — begge kryds overlevede, version 5 |
+| Ugerne | 24 bevaret, ikke overskrevet af enhed B's tomme `weeks: []` |
+| Enhed A genindlæser | henter enhed B's kryds, `0_0=8 km`, `0_1=15 km` |
+| `DELETE /api/sync` | 204, og både bruger og bibliotek væk via cascade |
+
+Den fjerde linje er lige så vigtig som den tredje: enhed B sendte et ældre `updatedAt`, og serveren beholdt sit indhold. Det er `updatedAt`-reglen der arbejder — feltet fandtes slet ikke i klienten indtil gennemgangen fandt det, så serveren vandt ved et tilfælde.
+
+Den femte fandt en fejl: klienten **skubbede kun**. `syncNow` kørte ved nyt login og derefter kun når noget ændrede sig lokalt, så en anden enheds ændring var usynlig indtil denne skrev noget. Ved genindlæsning er `state.session` allerede sat, så `onAuthStateChange` læser det som "var logget ind i forvejen" og springer over. `init()` synkroniserer nu også når der allerede er en session.
+
 ### Det der kan tabe data, og hvordan det er hegnet
 
 Fletningen er den ene del af C der fejler i stilhed — en bruger opdager ikke at en session forsvandt, de tror de huskede forkert. Derfor er den rene funktioner testet uden browser og uden database.
@@ -185,6 +205,29 @@ Fundet 2026-09-06 ved at teste `replan_used`-eventet ende til ende. Endpointet h
 **Sessionsantal er pr. uge, ikke pr. plan.** Serveren udledte ét tal og krævede at hver returneret uge havde præcis så mange sessioner. Men en løbsuge har legitimt færre end en build-uge. Målt mod produktion før rettelsen: sender man `[3,3,2]` ind, kommer `[3,3,3]` retur med status 200 — løbsugen får lydløst en session den ikke skulle have. Sender man `[4,3,2]`, afvises svaret to gange og ender som 500 efter to betalte kald. Hvilken af de to man rammer er ikke deterministisk, for det afhænger af om modellen adlyder instruktionen eller spejler sit input.
 
 Lektien er fasetabellens, en etage dybere: **struktur i kode, og strukturen skal have den rigtige granularitet.** Ét sessionstal for hele planen var forkert på præcis samme måde som én prosatabel for alle uger var det.
+
+### Supabases SQL-editor ødelægger funktionskroppe — brug MCP i stedet
+Editoren har en hjælper der automatisk tilføjer RLS på nyoprettede tabeller. Den holder ikke styr på `$`-citering, så den læser `end;` inde i en plpgsql-krop som slutningen på sætningen og klistrer sin egen linje ind **før** det afsluttende `$`:
+
+```
+end;
+-- Added by Supabase: enable Row Level Security on newly created tables
+ALTER TABLE cur_doc ENABLE ROW LEVEL SECURITY;
+```
+
+Den troede at `cur_doc` — en lokal variabel — var en tabel. Kroppen blev aldrig lukket, og `sync_library` blev aldrig oprettet, mens `create table` i samme kørsel gik fint fordi den ikke indeholder `$`.
+
+Det kostede to fejldiagnoser. Først lød fejlen `function ... does not exist` selv om `pg_proc` viste en række, og bagefter rapporterede PostgREST den som *"not found in schema cache"* fordi rettighederne også manglede. **Får du den besked på en funktion du kan se i databasen, er det rettigheder, ikke cachen.**
+
+Kør migrationer gennem Supabase-MCP'en (`.mcp.json` ligger i repoet, godkend med `/mcp`), ikke gennem dashboardets editor.
+
+### `revoke ... from public` lukker også døren for service-rollen
+`revoke all on function ... from public, anon, authenticated` er rigtigt: uden den kan enhver med anon-nøglen kalde en `security definer`-funktion med et fremmed `p_user_id`, og RLS stopper dem ikke. Men Postgres giver `EXECUTE` til `PUBLIC` som standard, og `service_role` arver den frem for at være superuser — så revoke'en tager rettigheden fra endpointet i samme greb. Der skal et eksplicit `grant execute ... to service_role` bagefter.
+
+### Login slettede biblioteket
+At registrere `onAuthStateChange` er det der får `detectSessionInUrl` til at hente tokenet ud af URL-fragmentet, og den fyrer med det samme. Lytteren stod tre linjer over `state.planIndex = await loadIndex()`, så login-synkroniseringen kørte mod et tomt indeks: der blev sendt et dokument uden planer, og svaret blev skrevet tilbage over `plans-index`. Planerne overlevede under deres egne nøgler, forældreløse og usynlige.
+
+Nu læses biblioteket før auth wires, **og** et `libraryReady`-flag får `syncNow` til at udskyde — rækkefølgen alene er for skrøbelig, fordi lytteren kan fyre når som helst. `applyDoc` fjerner desuden aldrig en plan bare fordi svaret undlader den; det kræver en tombstone.
 
 ### Vercel læser ikke `.gitignore`
 Uden `.vercelignore` uploades hele mappen. En 130MB fil i en urelateret mappe væltede et deploy med *"File size limit exceeded (100 MB)"*.
@@ -252,6 +295,12 @@ Kald der afvises før modellen (400, 422, 429) og alt mod den lokale stub-server
 | `api/scan.js` | Screenshot → aktiviteter |
 | `scripts/validate-generate.mjs` | Prompt-gate, 16 samples, exit 0/1 |
 | `scripts/sweep-plan-length.mjs` | Finder hvor lange planer knækker |
+| `api/sync.js` | Fletningen som rene funktioner **plus** endpointet. Fletningen eksporteres, så gaten kører den rigtige kode |
+| `scripts/validate-sync.mjs` | Gate for fletningen, 19 tilfælde, exit 0/1. Kør den før du rører fletningen |
+| `supabase/schema.sql` | Tabel, RLS og `sync_library()`. Anvendes i hånden — der er intet migreringsværktøj, så filen og databasen holdes i takt manuelt |
+| `privacy.html` | Privatlivspolitik. Ruten `/privacy` skal ligge **før** filsystem-fasen |
+| `fonts/` | Selvhostede woff2. Google Fonts sender besøgendes IP til Google |
+| `.mcp.json` | Supabase-MCP. Godkend med `/mcp`. Brug den frem for dashboardets SQL-editor |
 | `docs/superpowers/specs/` | Design-specs. C ligger i `2026-09-06-c-cloud-sync-design.md` |
 | `vercel.json` | Routing. Bruger det gamle `builds`-format — `functions` og `builds` udelukker hinanden. catch-all'en skal blive stående som `/(?!_vercel/)(.*)`, ellers sluger den `/_vercel/*` |
 | `.vercelignore` | Vercel læser ikke `.gitignore` |

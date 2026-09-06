@@ -47,13 +47,26 @@ C bringer også ting ind som ikke er tekniske. I dag gemmer appen nul persondata
 ### Resten
 
 - [x] ~~**Supabase-projekt: auth + Postgres.**~~ Oprettet via Vercels Marketplace-integration, ref `pxbrkdymegmizyvaqude`. Skemaet er kørt: tabellen `libraries`, RLS-politikkerne, indekset og `sync_library()`. Kilden ligger i `supabase/schema.sql` — der er intet migreringsværktøj, så de to skal holdes i takt manuelt.
-- [ ] **Bekræft regionen er EU.** `settings/general` på projektet. DNS peger på AWS-europæisk adresseblok, men det er et indicium, ikke en bekræftelse — og det kan ikke ændres bagefter. Der ligger persondata i basen nu.
+- [x] ~~**Bekraeft regionen er EU.**~~ eu-west-1, Irland. Laest fra projektet via Supabase-MCP, ikke gaettet ud fra en IP-blok. Staar i privatlivspolitikken.
 - [ ] **Accepter Supabases databehandleraftale**, `supabase.com/legal/dpa`. Den skal accepteres, ikke bare læses. Aktuel nu — der findes en brugerkonto i basen.
-- [ ] **Privatlivspolitik og en slette-mig-funktion.** Findes ikke i appen i dag, og begge dele følger med i det øjeblik du gemmer en email.
+- [x] ~~**Privatlivspolitik og en slette-mig-funktion.**~~ Politikken ligger paa /privacy med rigtige selskabsoplysninger, og slet-konto-knappen er verificeret mod produktionsdatabasen: 204, og baade bruger og bibliotek vaek via cascade.
 - [x] ~~Magic link auth (email, ingen adgangskode)~~ `fef2401`. Verificeret ende til ende 2026-09-06: link sendt, modtaget, klikket, session hydreret.
 - [x] ~~Cloud sync: planer og sessioner i skyen~~ `5fb6931`. Ikke *i stedet for* localStorage — localStorage forblev det primære lager, og skyen er et spejl. Det var beslutning 3.
 - [x] ~~`/api/migrate-plan`~~ **udgår.** Første login er bare den første synkronisering mod et tomt dokument, og fletningen klarer resten. Det fjerner også hele uuid-problemet CEO-planen brugte et afsnit på: `plan.id` forlader aldrig dokumentet.
 - [ ] **Email-felt i wizarden** — flyttet hertil fra B1. Teksten lover "gemmes når du logger ind", og der er intet login før C. En email i localStorage gør heller ikke migreringen lettere, for sign-in-flowet spørger alligevel. Bygges sammen med magic link auth.
+
+---
+
+## Fra compliance-gennemgangen 2026-09-06
+
+Kørt mod den live side med målinger, ikke skøn. Lukket: farvekontrast (`--subtle` var 4,48 mod hvid, grænsen er 4,5 — nu `#767676` = 4,54), selvhostede skrifttyper, samtykketekst ved email-feltet, privatlivspolitik, og slet-min-konto.
+
+**Cookiebanner og cookiepolitik kan springes over.** Der sættes nul cookies — `document.cookie` er tom. Supabase gemmer sessionen i localStorage, og Vercel Web Analytics er cookiefri. Det holder kun så længe det passer: en chat-widget, en YouTube-embed eller Google Analytics ændrer det med det samme.
+
+- [ ] **Kontaktoplysninger på selve siden.** Politikkens footer har CVR og adresse, men forsiden har ingenting. Det er e-handelslovens krav, ikke GDPR's.
+- [ ] **Vilkår og betingelser.** Ikke strengt påkrævet for en gratis app, men god skik når der er konti.
+- [ ] **Engelsk privatlivspolitik.** Appen er tosproget; politikken er kun dansk. Skal på plads før appen vises til nogen der ikke læser dansk.
+- [ ] **Copyright på `hero-video.mp4` og `logo.png`.** Egne optagelser eller stock med licens? Kan kun besvares af Jacob.
 
 ---
 

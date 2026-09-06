@@ -25,11 +25,16 @@ Haiku 4.5: $1 pr. million input-tokens, $5 pr. million output. Output er det dyr
 
 **1. Struktur i kode, indhold fra modellen.** Faser, ugetal og andet der skal være præcist beregnes i JavaScript og udleveres til Claude. Den oprindelige prompt lod modellen selv tælle: 4 af 15 samples bestod. Med faserne udleveret: 14 af 15. Enhver ny AI-funktion skal følge samme mønster.
 
-**2. Kør gaten før du rører en prompt.**
+**2. Kør gaten før du rører en prompt — eller fletningen.**
 ```bash
-ANTHROPIC_API_KEY=... node scripts/validate-generate.mjs
+ANTHROPIC_API_KEY=... node scripts/validate-generate.mjs   # prompten, 16 samples
+node scripts/validate-sync.mjs                             # fletningen, 19 tilfælde
 ```
-16 samples, exit 0/1. Senest 16/16.
+Begge exit 0/1. Senest 16/16 og 19/19.
+
+Fletnings-gaten kræver hverken nøgle eller netværk. Den findes fordi fletningen er den ene del af cloud sync der kan tabe data i stilhed — en bruger opdager ikke at en session forsvandt, de tror de huskede forkert.
+
+**Og husk hvad en gate ikke kan se.** Da fletningen blev skrevet, gav alle plan-tests et eksplicit `updatedAt` med, mens ingen plan i produktionen havde feltet. Gaten var grøn og beviste noget om en dokumentform ingen havde. Fire af dagens fem synkroniseringsfejl lå i *hvornår* fletningen blev kaldt, ikke i fletningen.
 
 
 ## Skill routing
