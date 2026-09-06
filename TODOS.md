@@ -57,6 +57,24 @@ C bringer også ting ind som ikke er tekniske. I dag gemmer appen nul persondata
 
 ---
 
+## Profilside — planerne skal have deres eget sted
+
+- [ ] **Byg en profilside.** I dag tegner `renderLibrary()` marketing-forsiden og de gemte planer i samme view: hero-video, ticker, wordmark og tagline, og så planerne nedenunder. Der findes ikke et sted der er dit.
+
+  Tre ting det koster i dag:
+
+  **En tilbagevendende bruger henter 27 MB hero-video for at nå sin egen plan.** `hero-video.mp4` indlæses hver gang forsiden vises, også når du kun skal krydse søndagens lange tur af.
+
+  **Forsiden sælger produktet til nogen der allerede bruger det.** Tagline og ticker giver mening for en førstegangsbesøgende og er støj for alle andre.
+
+  **Auth-tingene har ingen naturlig plads.** Login-boksen, log ud og slet-konto ligger i bunden af en enkelt plans PLAN-fane, fordi der ikke var andre steder at gøre af dem. De hører til på en profil, ikke inde i en træningsplan.
+
+  Formen kunne være: forsiden bliver ved med at være salgssiden for folk uden planer, og har man planer, lander man på profilen i stedet. Profilen samler biblioteket, kontoen, synkroniseringsstatus og sletning ét sted.
+
+  Bemærk at det rører `state.view`, som i dag kun kender `library`, `wizard` og `plan`.
+
+---
+
 ## Kræver et menneske, ikke kode
 
 - [ ] **Fase-tabellens hul for uge 21-24.** Reglen siger "tilføj 1 BASE-uge, maks 8 BASE-uger totalt", men ikke hvad der sker når loftet er nået og planen skal være længere endnu. `allocatePhases()` forlænger bare BASE videre.
