@@ -49,7 +49,7 @@ Skriv ikke en Jest-opsætning ind i projektet som en del af den her plan. Det er
 
 ---
 
-## Task 1: Tidsstempel på fremdrift
+## ✅ Task 1: Tidsstempel på fremdrift
 
 Bagudkompatibel og kan sendes ud alene. Jo før den er ude, jo mere fremdrift er tidsstemplet den dag skyen tændes.
 
@@ -139,7 +139,7 @@ git commit -m "feat(progress): stamp each entry with when it was written"
 
 ---
 
-## Task 2: Lokale tombstones ved sletning
+## ✅ Task 2: Lokale tombstones ved sletning
 
 Uden et lokalt spor kan klienten ikke fortælle serveren at en plan er slettet, og serverens kopi ville blive flettet tilbage.
 
@@ -199,7 +199,7 @@ git commit -m "feat(delete): leave a tombstone so a deleted plan cannot come bac
 
 ---
 
-## Task 3: Fletningen og dens gate
+## ✅ Task 3: Fletningen og dens gate
 
 Ren TDD. Ingen netværk, ingen database, ingen env-variabler.
 
@@ -393,7 +393,7 @@ Værst: **gaten skjuler det.** Alle tre plan-tests giver et eksplicit `updatedAt
 
 ---
 
-## Task 4: Supabase-projekt og skema
+## ✅ Task 4: Supabase-projekt og skema
 
 **Files:**
 - Create: `supabase/schema.sql`
@@ -461,7 +461,7 @@ git commit -m "feat(db): the libraries table, one row per user"
 
 ---
 
-## Task 5: `/api/sync`
+## ✅ Task 5: `/api/sync`
 
 **Files:**
 - Modify: `api/sync.js` — tilføj default-eksporteret handler under de eksisterende eksporter
@@ -625,7 +625,7 @@ git commit -m "feat(sync): the endpoint, merging inside a locked transaction"
 
 ---
 
-## Task 6: Auth — magic link og no-store
+## ✅ Task 6: Auth — magic link og no-store
 
 **Files:**
 - Modify: `index.html` — Supabase-klient fra CDN, login-felt, sessionshåndtering, I18N-nøgler
@@ -721,7 +721,7 @@ git commit -m "feat(auth): optional magic-link sign-in, and no-store for the has
 
 ---
 
-## Task 7: Synkroniseringsløkken
+## ✅ Task 7: Synkroniseringsløkken
 
 **Files:**
 - Modify: `index.html`
@@ -877,7 +877,7 @@ git commit -m "feat(sync): back the library up continuously when signed in"
 
 ---
 
-## Task 8: Login foreslås efter første plan
+## ✅ Task 8: Login foreslås efter første plan
 
 **Files:**
 - Modify: `index.html`
@@ -930,7 +930,7 @@ git commit -m "feat(auth): offer sign-in once there is a plan worth keeping"
 
 ---
 
-## Task 9: Sletning af konto og privatlivspolitik
+## ✅ Task 9: Sletning af konto og privatlivspolitik
 
 **Files:**
 - Modify: `index.html` — sletteknap i indstillinger

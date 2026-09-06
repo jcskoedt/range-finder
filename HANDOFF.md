@@ -28,9 +28,13 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Slet min konto | virker, verificeret: 204 og rækken væk via cascade |
 | Skrifttyper | selvhostet, ingen Google i anmodningskæden |
 
-Tilbage: **C** (konti + cloud sync) og en håndfuld mindre punkter — se `TODOS.md`.
+**C er bygget og verificeret** — bortset fra opbevaringsreglen. Task 1-9 og 11 af `docs/superpowers/plans/2026-09-06-c-cloud-sync.md` er i produktion. Designet ligger i `docs/superpowers/specs/2026-09-06-c-cloud-sync-design.md`; læs den før du rører fletningen.
 
-C er designet færdigt: `docs/superpowers/specs/2026-09-06-c-cloud-sync-design.md`. Ti beslutninger, datamodel, fletteregler og testtilfælde. Læs den før du rører C.
+> **Politikken lover noget der ikke findes endnu.** `/privacy` siger at inaktive konti slettes efter 12 måneder med en advarsel efter 11. Verificeret i databasen 2026-09-06: `sweep_inactive` findes ikke, og `pg_cron` er ikke installeret. Det er Task 10, og indtil den er kørt, står der et løfte på en offentlig side som ikke holder.
+
+**Og magic link virker kun for organisationens egne medlemmer.** Supabases indbyggede mailserver afviser alle andre adresser med `Email address not authorized` og har et loft på 2 mails i timen. Appen viser ingen fejl — brugeren får bare aldrig noget. Custom SMTP via Resend er derfor ikke valgfrit, og det er den eneste ting der spærrer for at nogen ud over Jacob kan logge ind. Se `TODOS.md` under C.
+
+Resten af det åbne arbejde står i `TODOS.md`.
 
 Målingen kører. Verificeret i produktion 2026-09-06: `/_vercel/insights/script.js` svarer `200 application/javascript`, 3106 bytes — det rigtige script, ikke SPA'en. Det bekræfter både routing-rettelsen og at toggle'en er sat, for edge injicerer kun scriptet når Web Analytics er slået til.
 
