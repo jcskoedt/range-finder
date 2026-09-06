@@ -26,6 +26,10 @@
       "use": "@vercel/static"
     },
     {
+      "src": "privacy.html",
+      "use": "@vercel/static"
+    },
+    {
       "src": "fonts/**",
       "use": "@vercel/static"
     },
@@ -45,6 +49,10 @@
         "Cache-Control": "no-store"
       },
       "continue": true
+    },
+    {
+      "src": "/privacy",
+      "dest": "/privacy.html"
     },
     {
       "handle": "filesystem"

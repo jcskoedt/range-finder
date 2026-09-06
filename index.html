@@ -1196,6 +1196,7 @@ en:{
   auth_email_ph:"you@email.com", auth_send:"Send sign-in link", auth_sent:"Check your inbox.",
   auth_failed:"Could not send the link. Try again.", auth_signout:"Sign out", auth_signed_in:"Signed in as {email}",
   auth_consent:"Your address is used for one thing: sending you a sign-in link. Your plans and progress are stored so you can get them back. Nothing else, and no marketing.",
+  auth_privacy:"Privacy policy",
   sync_saved:"Backed up", sync_saving:"Saving", sync_pending:"Not saved yet",
   export_ical_done_one:"1 session downloaded — open the file to add it to your calendar.",
   export_ical_done_many:"{n} sessions downloaded — open the file to add them to your calendar.",
@@ -1354,6 +1355,7 @@ da:{
   auth_email_ph:"din@email.dk", auth_send:"Send login-link", auth_sent:"Tjek din indbakke.",
   auth_failed:"Linket kunne ikke sendes. Prøv igen.", auth_signout:"Log ud", auth_signed_in:"Logget ind som {email}",
   auth_consent:"Din adresse bruges til én ting: at sende dig et login-link. Dine planer og din fremdrift gemmes, så du kan få dem igen. Ikke andet, og ingen markedsføring.",
+  auth_privacy:"Privatlivspolitik",
   sync_saved:"Gemt i skyen", sync_saving:"Gemmer", sync_pending:"Ikke gemt endnu",
   export_ical_done_one:"1 træning hentet — åbn filen for at lægge den i din kalender.",
   export_ical_done_many:"{n} træninger hentet — åbn filen for at lægge dem i din kalender.",
@@ -2050,7 +2052,7 @@ function authBoxHtml(){
       <input type="email" id="authEmail" placeholder="${t("auth_email_ph")}" autocomplete="email">
       <button class="btn btn-outline" id="authSend">${t("auth_send")}</button>
     </div>
-    <div class="auth-consent">${t("auth_consent")}</div>
+    <div class="auth-consent">${t("auth_consent")} <a href="/privacy" target="_blank" rel="noopener">${t("auth_privacy")}</a></div>
   </div>`;
 }
 

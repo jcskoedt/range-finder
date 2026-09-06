@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privatlivspolitik · Range Finder</title>
+<style>
+/* Same self-hosted faces as the app. See index.html for why these are not
+   loaded from Google. */
+@font-face{font-family:"Inter";font-style:normal;font-weight:200 700;font-display:swap;
+  src:url(/fonts/inter-200-700-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:"Turret Road";font-style:normal;font-weight:700;font-display:swap;
+  src:url(/fonts/turret-road-700-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+
+:root{
+  --bg:#FFFFFF; --text:#0A0A0A; --subtle:#767676; --border:#0A0A0A;
+  --yellow:#F5E642; --hair:#DDDDD6;
+}
+*{box-sizing:border-box;}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:'Inter',system-ui,sans-serif; font-size:16px; line-height:1.65;
+  margin:0; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px;margin:0 auto;padding:56px 24px 96px;}
+@media(max-width:640px){.wrap{padding:36px 18px 64px;}}
+a{color:inherit;text-underline-offset:3px;}
+a:focus-visible{outline:2px solid var(--yellow);outline-offset:3px;}
+.eyebrow{
+  font-family:'Turret Road',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--subtle);margin:0 0 6px;
+}
+h1{font-family:'Turret Road',sans-serif;font-weight:700;font-size:clamp(30px,6vw,44px);
+   line-height:1.05;margin:0 0 8px;}
+h2{font-family:'Turret Road',sans-serif;font-weight:700;font-size:19px;
+   margin:40px 0 10px;padding-bottom:8px;border-bottom:2px solid var(--border);}
+h3{font-size:15px;font-weight:600;margin:22px 0 4px;}
+p,li{max-width:64ch;}
+p{margin:0 0 12px;}
+ul{margin:0 0 12px;padding-left:20px;}
+li{margin-bottom:6px;}
+.updated{color:var(--subtle);font-size:13px;margin-bottom:0;}
+table{border-collapse:collapse;width:100%;font-size:14.5px;margin:12px 0 16px;}
+th,td{text-align:left;padding:9px 12px 9px 0;border-bottom:1px solid var(--hair);vertical-align:top;}
+th{font-family:'Turret Road',sans-serif;font-size:10px;font-weight:700;
+   letter-spacing:.14em;text-transform:uppercase;color:var(--subtle);
+   border-bottom:2px solid var(--border);}
+.todo{
+  border:2px solid var(--border);background:var(--yellow);color:#0A0A0A;
+  padding:16px 18px;margin:24px 0;
+}
+.todo strong{font-family:'Turret Road',sans-serif;letter-spacing:.02em;}
+.todo p{margin:6px 0 0;max-width:none;}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.88em;
+     background:#FAFAF7;border:1px solid var(--hair);padding:1px 5px;}
+.back{display:inline-block;font-family:'Turret Road',sans-serif;font-size:11px;
+      font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:28px;}
+footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--hair);
+       color:var(--subtle);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="/">← Tilbage til appen</a>
+
+<p class="eyebrow">Range Finder</p>
+<h1>Privatlivspolitik</h1>
+<p class="updated">Senest opdateret 6. september 2026</p>
+
+<div class="todo">
+  <strong>Skal udfyldes før offentliggørelse</strong>
+  <p>Virksomhedsnavn, CVR-nummer, adresse og kontaktadresse mangler nedenfor og er markeret med <code>[UDFYLDES]</code>. Supabases hostingregion skal også bekræftes. Uden dem er politikken ikke gyldig, fordi den dataansvarlige ikke kan identificeres.</p>
+</div>
+
+<h2>Kort fortalt</h2>
+<p>Du kan bruge Range Finder helt uden konto. Gør du det, forlader dine planer aldrig din browser, og vi har ingen persondata om dig overhovedet.</p>
+<p>Vælger du at logge ind, gemmer vi din emailadresse og dine træningsplaner, så du kan få dem igen hvis du rydder din browser eller skifter enhed. Det er hele formålet. Der er ingen markedsføring, ingen videresalg og ingen profilering.</p>
+
+<h2>Dataansvarlig</h2>
+<p>
+  [UDFYLDES: virksomhedsnavn]<br>
+  CVR: [UDFYLDES]<br>
+  [UDFYLDES: adresse]<br>
+  Kontakt: [UDFYLDES: emailadresse]
+</p>
+
+<h2>Hvad vi gemmer, og hvorfor</h2>
+
+<h3>Uden konto</h3>
+<p>Alt ligger i din egen browsers lager (<code>localStorage</code>). Vi kan ikke se det, og det sendes ingen steder hen. Rydder du dine browserdata, er det væk — også for dig.</p>
+
+<h3>Med konto</h3>
+<table>
+  <thead><tr><th>Data</th><th>Hvorfor</th><th>Retsgrundlag</th></tr></thead>
+  <tbody>
+    <tr><td>Emailadresse</td><td>At sende dig et login-link. Vi bruger ikke adgangskoder</td><td>Opfyldelse af aftale</td></tr>
+    <tr><td>Dine træningsplaner</td><td>At kunne give dem tilbage på en anden enhed eller efter en browserrydning</td><td>Opfyldelse af aftale</td></tr>
+    <tr><td>Din fremdrift</td><td>Hvilke træningspas du har krydset af, og hvor mange kilometer</td><td>Opfyldelse af aftale</td></tr>
+    <tr><td>Tidspunkt for seneste brug</td><td>At kunne slette inaktive konti automatisk</td><td>Legitim interesse i ikke at gemme data i det uendelige</td></tr>
+  </tbody>
+</table>
+<p>Vi beder ikke om navn, fødselsdato, vægt, puls eller placering, og vi gemmer det ikke.</p>
+
+<h2>Når du får lavet en plan</h2>
+<p>Planen skrives af en sprogmodel hos Anthropic. Vi sender kun det du har udfyldt i guiden: sportsgren, måldistance, niveau, hvor mange uger du har, og hvor langt du plejer at træne.</p>
+<p><strong>Din emailadresse sendes aldrig med.</strong> Anthropic kan ikke knytte planen til dig.</p>
+
+<h2>Hvem behandler data for os</h2>
+<table>
+  <thead><tr><th>Leverandør</th><th>Rolle</th><th>Hvor</th></tr></thead>
+  <tbody>
+    <tr><td>Supabase</td><td>Database og login</td><td>[UDFYLDES: bekræft region, skal være EU]</td></tr>
+    <tr><td>Vercel</td><td>Hosting og drift af selve siden</td><td>Globalt netværk</td></tr>
+    <tr><td>Anthropic</td><td>Genererer selve træningsplanen</td><td>USA</td></tr>
+    <tr><td>Resend</td><td>Afsendelse af login-mails</td><td>Se leverandørens vilkår</td></tr>
+  </tbody>
+</table>
+<p>Alle fire er databehandlere. Vi har databehandleraftaler med dem, og de må kun bruge data til at levere tjenesten til os.</p>
+
+<h2>Cookies</h2>
+<p><strong>Vi sætter ingen cookies.</strong> Ikke til statistik, ikke til reklame, ikke til noget.</p>
+<p>Er du logget ind, gemmer vi en login-nøgle i din browsers <code>localStorage</code>, så du ikke skal logge ind igen ved hvert besøg. Den er nødvendig for den funktion du selv har bedt om, og den bruges ikke til at følge dig.</p>
+
+<h2>Statistik</h2>
+<p>Vi bruger Vercel Web Analytics til at se om appen overhovedet bliver brugt. Den er cookiefri og registrerer ikke personhenførbare oplysninger.</p>
+<p>Vi tæller hvor mange planer der laves, hvor mange træningspas der krydses af, og om planen kom fra sprogmodellen eller vores egen algoritme. Der er ingen fritekst, ingen kilometertal, ingen datoer og intet id i de tal — vi kan ikke se hvad <em>du</em> har gjort, kun hvor mange der gjorde hvad.</p>
+
+<h2>Hvor længe vi gemmer det</h2>
+<p>Bruger du ikke din konto i <strong>12 måneder</strong>, sletter vi den og alt indhold automatisk. Du får en advarsel på email efter 11 måneder, så du kan nå at logge ind hvis du vil beholde den.</p>
+<p>Sletter du selv din konto, sker det med det samme og kan ikke fortrydes.</p>
+
+<h2>Dine rettigheder</h2>
+<ul>
+  <li><strong>Indsigt</strong> — du kan få at vide hvad vi har om dig</li>
+  <li><strong>Berigtigelse</strong> — du kan få rettet forkerte oplysninger</li>
+  <li><strong>Sletning</strong> — du kan få alt slettet</li>
+  <li><strong>Dataportabilitet</strong> — du kan få dine data udleveret i et maskinlæsbart format</li>
+  <li><strong>Indsigelse</strong> — du kan gøre indsigelse mod vores behandling</li>
+</ul>
+<p>Skriv til [UDFYLDES: emailadresse]. Vi svarer inden for en måned.</p>
+<p>Du kan altid tage dine planer med dig uden at kontakte os: brug <em>Del denne plan</em>, som lægger hele planen i et link, eller <em>Læg i kalender</em>, som giver dig en <code>.ics</code>-fil.</p>
+
+<h2>Klage</h2>
+<p>Er du utilfreds med hvordan vi behandler dine oplysninger, kan du klage til Datatilsynet, Carl Jacobsens Vej 35, 2500 Valby — <a href="https://www.datatilsynet.dk">datatilsynet.dk</a>.</p>
+
+<h2>Ændringer</h2>
+<p>Ændrer vi denne politik, opdaterer vi datoen øverst. Er ændringen væsentlig, siger vi det i appen.</p>
+
+<footer>
+  Range Finder · <a href="/">rangefinderapp.vercel.app</a>
+</footer>
+
+</div>
+</body>
+</html>
