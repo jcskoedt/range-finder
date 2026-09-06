@@ -1571,7 +1571,9 @@ async function runReplan(plan,sw){
         body:JSON.stringify({
           plan_id:plan.id,
           sport:plan.sport,
-          fitness_level:state.wizardFitness,
+          // Plans saved before fitnessLevel existed have none; the wizard
+          // default is no worse a guess for those than it was before.
+          fitness_level:plan.fitnessLevel||state.wizardFitness,
           target_km:plan.target,
           sessions_per_week:plan.sessionsPerWeek,
           goal_event:plan.target+" km "+t("goal_"+plan.sport),
@@ -1742,7 +1744,7 @@ function planToShareable(plan){
   return{v:1,sport:plan.sport,label:plan.label,target:plan.target,
     weeksAvailable:plan.weeksAvailable,sessionsPerWeek:plan.sessionsPerWeek,
     startDate:plan.startDate,raceDate:plan.raceDate||null,
-    generatedBy:plan.generatedBy||null,weeks:plan.weeks};
+    generatedBy:plan.generatedBy||null,fitnessLevel:plan.fitnessLevel||null,weeks:plan.weeks};
 }
 
 // undefined = not computed yet, null = too long to share, string = ready.
@@ -1845,6 +1847,10 @@ function apiPlanToLocalPlan(apiPlan,wiz){
     startDate:wiz.startDate,
     raceDate:wiz.raceDate||null,
     createdAt:new Date().toISOString().slice(0,10),
+    // The wizard state resets on reload, so a replan afterwards used to send
+    // the default "Motionist" whatever the athlete picked. The plan has to
+    // remember it, the same way it remembers phaseKey.
+    fitnessLevel:wiz.fitnessLevel||null,
     generatedBy:"ai",
     capped:apiPlan.capped===true,
     weeks:apiPlan.weeks.map(w=>({
@@ -2066,7 +2072,7 @@ function renderLibrary(loading){
       weeksAvailable:src.weeks.length,sessionsPerWeek:src.sessionsPerWeek,
       startDate:src.startDate||new Date().toISOString().slice(0,10),
       raceDate:src.raceDate||null,createdAt:new Date().toISOString().slice(0,10),
-      generatedBy:src.generatedBy||null,importedFromShare:true,weeks:src.weeks,progress:{}};
+      generatedBy:src.generatedBy||null,fitnessLevel:src.fitnessLevel||null,importedFromShare:true,weeks:src.weeks,progress:{}};
     await savePlan(plan);
     state.planCache[plan.id]=plan;
     state.planIndex.push({id:plan.id,sport:plan.sport,label:plan.label,weeksAvailable:plan.weeksAvailable,sessionsPerWeek:plan.sessionsPerWeek,createdAt:plan.createdAt});
@@ -2277,7 +2283,7 @@ function renderWizard(){
         // from a network failure — so name it here and clear it once the plan
         // is actually in hand.
         fallbackReason="malformed";
-        plan=apiPlanToLocalPlan(await res.json(),{sport:state.wizardSport,target,sessionsPerWeek:sessions,startDate,raceDate});
+        plan=apiPlanToLocalPlan(await res.json(),{sport:state.wizardSport,target,sessionsPerWeek:sessions,startDate,raceDate,fitnessLevel:fitness});
         // WEEKS_OPTIONS goes to 52 weeks but the API caps plans at 24, so say so
         // rather than silently handing back a shorter plan than was asked for.
         if(plan.capped)notice=t("notice_capped",{n:plan.weeksAvailable});
@@ -2302,7 +2308,7 @@ function renderWizard(){
     if(!plan){
       if(!notice)notice=t("notice_fallback");
       const wk=generatePlan(state.wizardSport,target,weeks,sessions,longest,minSession);
-      plan={id:"p"+Date.now(),sport:state.wizardSport,label:target+" km "+SPORTS[state.wizardSport].label.toLowerCase(),target,weeksAvailable:weeks,sessionsPerWeek:sessions,startDate,raceDate:raceDate||null,createdAt:new Date().toISOString().slice(0,10),generatedBy:"algorithm",weeks:wk,progress:{}};
+      plan={id:"p"+Date.now(),sport:state.wizardSport,label:target+" km "+SPORTS[state.wizardSport].label.toLowerCase(),target,weeksAvailable:weeks,sessionsPerWeek:sessions,startDate,raceDate:raceDate||null,createdAt:new Date().toISOString().slice(0,10),fitnessLevel:fitness,generatedBy:"algorithm",weeks:wk,progress:{}};
     }
 
     // Gate 0 lives on these two lines: plan_generated says a plan was made,
