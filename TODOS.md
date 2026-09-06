@@ -30,9 +30,23 @@ Målingen kører i produktion. Tilbage er at få rigtige folk igennem den:
 
 Målingen kører nu og kan besvare det. Den mangler kun rigtige brugere og tid.
 
-C bringer også ting ind som ikke er tekniske: persondata gør dig til databehandler (GDPR, sletning, privatlivspolitik), og implicit auth flow (token i URL-hash) blev accepteret som trade-off for B og skal genbesøges.
+C bringer også ting ind som ikke er tekniske. I dag gemmer appen nul persondata — alt ligger i brugerens egen localStorage — så der er ingen GDPR-forpligtelser overhovedet. Udløseren er emailadressen, ikke Supabase: i det øjeblik du indfører magic link, bliver du **dataansvarlig** og Supabase din **databehandler**. Og implicit auth flow (token i URL-hash) blev accepteret som trade-off for B og skal genbesøges.
 
-- [ ] Supabase-projekt: auth + Postgres
+### Start med denne — den har ventetid indbygget
+
+- [ ] **Resend-konto og verificeret afsenderdomæne.** Ikke en detalje til sidst: det er en forudsætning for at magic link virker for andre end dig selv.
+
+  Supabases indbyggede mailserver **sender kun til medlemmer af din egen Supabase-organisation**. Alle andre adresser fejler med `Email address not authorized`, og loftet er 2 mails i timen. Magic link vil altså virke perfekt når du tester på dig selv, og fejle for hver eneste testbruger. Kilde: supabase.com/docs/guides/auth/auth-smtp.
+
+  Rettelsen er custom SMTP. Resend står på Supabases egen liste og ligger i forvejen i backloggen til den ugentlige coaching-email, så én udbyder dækker begge. Verifikationen kræver DNS-records (SPF og DKIM), og DNS tager tid — derfor står punktet først.
+
+  Efter custom SMTP er slået til, sætter Supabase et startloft på 30 mails i timen, som kan skrues op på Rate Limits-siden.
+
+### Resten
+
+- [ ] **Supabase-projekt: auth + Postgres.** Vælg **EU-region ved oprettelsen** — det kan ikke laves om bagefter uden migrering.
+- [ ] **Accepter Supabases databehandleraftale**, `supabase.com/legal/dpa`. Den skal accepteres, ikke bare læses.
+- [ ] **Privatlivspolitik og en slette-mig-funktion.** Findes ikke i appen i dag, og begge dele følger med i det øjeblik du gemmer en email.
 - [ ] Magic link auth (email, ingen adgangskode)
 - [ ] Cloud sync: planer og sessioner i Supabase i stedet for localStorage
 - [ ] `/api/migrate-plan` — flyt localStorage-planer over ved første login
