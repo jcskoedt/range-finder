@@ -77,10 +77,86 @@ export function merge(server, client, now = Date.now()) {
   return { v: DOC_VERSION, plans, tombstones };
 }
 
-// The endpoint itself lands in Task 5 of
-// docs/superpowers/plans/2026-09-06-c-cloud-sync.md. Until then this answers
-// honestly instead of crashing: vercel.json builds every api/*.js as a
-// function, so this path is reachable the moment the file ships.
-export default async function handler(_req, res) {
-  return res.status(501).json({ error: "not_implemented" });
+// ---------------------------------------------------------------------------
+// The endpoint.
+//
+// Everything above this line is pure and testable by scripts/validate-sync.mjs.
+// Everything below needs a database. Keep the split — it is what lets the gate
+// run with no environment at all.
+
+// Auth is checked before the client is built, so a request with no token costs
+// nothing and can be tested without any Supabase project existing.
+function bearer(req) {
+  const h = req.headers.authorization || "";
+  return h.startsWith("Bearer ") ? h.slice(7).trim() : "";
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST" && req.method !== "DELETE") {
+    return res.status(405).json({ error: "method_not_allowed" });
+  }
+
+  const token = bearer(req);
+  if (!token) return res.status(401).json({ error: "no_token" });
+
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // Named explicitly rather than failing as a 500 five lines later: the
+    // Anthropic key being scoped to the wrong workspace cost this project an
+    // afternoon of debugging a working endpoint.
+    console.warn("[sync] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing");
+    return res.status(503).json({ error: "not_configured" });
+  }
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data: userData, error: userErr } = await admin.auth.getUser(token);
+  if (userErr || !userData || !userData.user) return res.status(401).json({ error: "invalid_token" });
+  const userId = userData.user.id;
+
+  if (req.method === "DELETE") {
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) {
+      console.warn("[sync] delete: " + error.message);
+      return res.status(500).json({ error: "delete_failed" });
+    }
+    return res.status(204).end();     // libraries row goes with it, on delete cascade
+  }
+
+  const body = req.body || {};
+  const clientDoc = body.doc;
+  if (!clientDoc || typeof clientDoc !== "object" || typeof clientDoc.plans !== "object") {
+    return res.status(400).json({ error: "invalid_doc" });
+  }
+  const baseVersion = Number.isInteger(body.baseVersion) ? body.baseVersion : 0;
+
+  const first = await admin.rpc("sync_library", {
+    p_user_id: userId, p_doc: clientDoc, p_base_version: baseVersion,
+  });
+  if (first.error) {
+    console.warn("[sync] " + first.error.message);
+    return res.status(500).json({ error: "sync_failed" });
+  }
+
+  let out = Array.isArray(first.data) ? first.data[0] : first.data;
+  if (out && out.conflict) {
+    // Someone else wrote since this client last synced. Merge against what the
+    // server actually holds, then write at the version we just read.
+    const merged = merge(out.doc, clientDoc);
+    const retry = await admin.rpc("sync_library", {
+      p_user_id: userId, p_doc: merged, p_base_version: out.version,
+    });
+    const retryRow = retry.error ? null : (Array.isArray(retry.data) ? retry.data[0] : retry.data);
+    if (!retryRow || retryRow.conflict) {
+      // A third device wrote in between. Nothing is lost — localStorage still
+      // holds everything — so let the client retry on its own schedule.
+      return res.status(409).json({ error: "retry" });
+    }
+    out = retryRow;
+  }
+
+  // conflict is internal between the SQL function and this handler.
+  return res.status(200).json({ doc: out.doc, version: out.version });
 }
