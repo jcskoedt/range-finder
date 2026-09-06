@@ -11,6 +11,9 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1.js" },
+    { "src": "/(index\\.html)?",
+      "headers": { "Cache-Control": "no-store" },
+      "continue": true },
     { "handle": "filesystem" },
     { "src": "/logo.png", "dest": "/logo.png" },
     { "src": "/icon.svg", "dest": "/icon.svg" },
