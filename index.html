@@ -689,6 +689,11 @@ body{
   background:none;border:none;color:#fff;cursor:pointer;
   font-size:14px;line-height:1;padding:0;flex-shrink:0;
 }
+.sync-badge{
+  position:fixed;bottom:22px;left:16px;z-index:50;
+  font-size:10px;font-weight:200;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--subtle);pointer-events:none;
+}
 .lang-toggle{
   position:fixed;bottom:16px;right:16px;z-index:50;
   display:flex;border:2px solid var(--border);background:var(--bg);
@@ -1019,6 +1024,8 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
 <!-- Supabase Auth. No build step here, so the UMD bundle comes from CDN and
      has to load before the app script uses window.supabase. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<div class="sync-badge" id="syncBadge" aria-live="polite"></div>
 
 <div class="lang-toggle" id="langToggle">
   <button type="button" data-lang="da">DA</button>
@@ -1928,6 +1935,110 @@ async function signOut(){
   state.session=null;render();
 }
 
+/* ---------------- CLOUD SYNC ---------------- */
+// localStorage is written first, always. Everything here only adds a backup, so
+// a failure delays the backup and never costs the user anything.
+
+let syncTimer=null,retryTimer=null,retryDelay=2000,syncBaseVersion=0,syncInFlight=false;
+
+async function buildDoc(){
+  const plans={};
+  for(const meta of state.planIndex){
+    const full=state.planCache[meta.id]||await loadPlan(meta.id);
+    if(full)plans[meta.id]=full;
+  }
+  return {v:1,plans,tombstones:await loadTombstones()};
+}
+
+// Replaces the local library with the server_s merged copy. Only ever called
+// when nothing was written locally while the request was in flight.
+async function applyDoc(doc){
+  applyingRemote=true;
+  try{
+  const plans=(doc&&doc.plans)||{};
+  const ids=Object.keys(plans);
+  for(const id of ids){state.planCache[id]=plans[id];await savePlan(plans[id]);}
+  state.planIndex=ids.map(id=>{
+    const p=plans[id];
+    return {id,sport:p.sport,label:p.label,weeksAvailable:p.weeksAvailable,
+            sessionsPerWeek:p.sessionsPerWeek,createdAt:p.createdAt};
+  });
+  await saveIndex(state.planIndex);
+  if(state.activePlan&&plans[state.activePlan.id])state.activePlan=plans[state.activePlan.id];
+  }finally{applyingRemote=false;}
+}
+
+function setSyncState(v){state.syncState=v;renderSyncBadge();}
+
+function renderSyncBadge(){
+  const el=document.getElementById("syncBadge");
+  if(!el)return;
+  if(!state.session){el.textContent="";return;}
+  el.textContent=t(state.syncState==="saved"?"sync_saved":state.syncState==="saving"?"sync_saving":"sync_pending");
+}
+
+function scheduleSync(){
+  if(!state.session)return;
+  clearTimeout(syncTimer);
+  // Debounced so ticking a week of sessions is one request, not seven.
+  syncTimer=setTimeout(()=>syncNow("change"),2000);
+}
+
+function scheduleRetry(){
+  clearTimeout(retryTimer);
+  retryTimer=setTimeout(()=>syncNow("retry"),retryDelay);
+  retryDelay=Math.min(retryDelay*4,60000);
+}
+
+async function syncNow(reason){
+  if(!state.session||!sb||syncInFlight)return;
+  syncInFlight=true;
+  const sentAtRev=localRev;
+  setSyncState("saving");
+  try{
+    const res=await fetch("/api/sync",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+state.session.access_token},
+      body:JSON.stringify({doc:await buildDoc(),baseVersion:syncBaseVersion})
+    });
+    if(res.status===401){
+      // Session expired. Stop quietly; sign-in is offered again on next load.
+      state.session=null;setSyncState("pending");syncInFlight=false;render();return;
+    }
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    const out=await res.json();
+
+    if(localRev!==sentAtRev){
+      // The user wrote while this was in flight, so the merged document the
+      // server sent back is already stale. Keep local, leave baseVersion alone
+      // so the next round still merges, and go again. Nothing is lost either
+      // way: the server_s changes arrive on the next response.
+      syncInFlight=false;
+      setSyncState("pending");
+      scheduleSync();
+      return;
+    }
+
+    syncBaseVersion=out.version;
+    await applyDoc(out.doc);
+    retryDelay=2000;
+    setSyncState("saved");
+    render();
+  }catch(e){
+    console.warn("[sync] "+reason+": "+e);
+    setSyncState("pending");
+    scheduleRetry();
+  }finally{
+    syncInFlight=false;
+  }
+}
+
+// Flush on the way out. The phone-in-the-pocket case: the tab is hidden long
+// before it is closed, and a debounce timer does not survive either.
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")syncNow("hidden");});
+window.addEventListener("pagehide",()=>syncNow("pagehide"));
+window.addEventListener("online",()=>syncNow("online"));
+
 /* ---------------- FREMDRIFT ---------------- */
 // Cloud sync afgør konflikter på hvornår en post blev skrevet. Uden det kan to
 // browsere ikke skilles ad: "krydset af på telefonen søndag" ser ud præcis som
@@ -1953,16 +2064,35 @@ async function addTombstone(id){
     const tomb=await loadTombstones();
     tomb[id]=new Date().toISOString();
     await withTimeout(window.storage.set(TOMBSTONE_KEY,JSON.stringify(tomb),false),STORAGE_TIMEOUT_MS,null);
+    markLocalWrite();
     return true;
   }catch(e){storageWarning(e);return false;}
 }
 async function saveIndex(idx){
-  try{await withTimeout(window.storage.set(INDEX_KEY,JSON.stringify(idx),false),STORAGE_TIMEOUT_MS,null);return true;}
+  try{await withTimeout(window.storage.set(INDEX_KEY,JSON.stringify(idx),false),STORAGE_TIMEOUT_MS,null);markLocalWrite();return true;}
   catch(e){storageWarning(e);return false;}
 }
 async function loadPlan(id){try{const r=await withTimeout(window.storage.get("plan-"+id,false),STORAGE_TIMEOUT_MS,null);return r&&r.value?JSON.parse(r.value):null;}catch(e){return null;}}
+// Every local write bumps this. A sync response is only safe to apply if the
+// counter has not moved since the request was sent — otherwise the response was
+// computed from an older document and applying it would erase whatever the user
+// did while it was in flight. That is the single most reachable way to lose a
+// ticked session in this design, so it is guarded rather than hoped about.
+let localRev=0,applyingRemote=false;
+function markLocalWrite(){
+  // applyDoc writes through savePlan too. Those are not user edits, and
+  // counting them would both bump the counter it is compared against and
+  // schedule a pointless round trip per plan in the library.
+  if(applyingRemote)return;
+  localRev++;scheduleSync();
+}
+
 async function savePlan(plan){
-  try{await withTimeout(window.storage.set("plan-"+plan.id,JSON.stringify(plan),false),STORAGE_TIMEOUT_MS,null);return true;}
+  try{
+    await withTimeout(window.storage.set("plan-"+plan.id,JSON.stringify(plan),false),STORAGE_TIMEOUT_MS,null);
+    markLocalWrite();
+    return true;
+  }
   catch(e){storageWarning(e);return false;}
 }
 
@@ -3204,8 +3334,13 @@ function render(){
       state.session=(data&&data.session)||null;
     }catch(e){console.warn("[auth] "+e);}
     sb.auth.onAuthStateChange((_e,session)=>{
+      const varLoggetInd=!!state.session;
       state.session=session||null;
       render();
+      renderSyncBadge();
+      // First sign-in is also the migration: the local library is pushed to an
+      // empty document and the merge does the rest. No separate endpoint.
+      if(state.session&&!varLoggetInd)syncNow("login");
     });
   }
   sharedPlan=await readSharedPlan();
