@@ -7,19 +7,19 @@ B1 (AI-plangenerering) og B2 (replan) er færdige og i produktion. Se `HANDOFF.m
 
 ## Lige nu: få tal på bordet
 
-Målingen er bygget og committet lokalt (se Færdigt). Den mangler to ting for at give noget:
+Målingen kører i produktion. Tilbage er at få rigtige folk igennem den:
 
-- [x] ~~**Deploy.**~~ Landet 2026-09-06, `ee79b8d`. Analytics-koden er live i produktion.
-- [ ] **Slå Web Analytics til** i Vercel-dashboardet. Toggle'en viser samtidig event-loftet på planen. **Indtil det sker samler målingen ingenting** — `track()` lægger events i `window.vaq`, køen tømmes aldrig, og der sker ellers ingenting. Ingen fejl for brugeren.
-- [ ] **Verificér når toggle'en er sat:**
+- [x] ~~**Deploy af analytics-koden.**~~ Landet 2026-09-06, `ee79b8d`.
+- [x] ~~**Push routing-rettelsen.**~~ `49202aa`. Uden den slugte SPA-catch-all'en `/_vercel/insights/script.js` og serverede `index.html` byte for byte, så analytics-scriptet aldrig indlæstes.
+- [x] ~~**Web Analytics slået til**~~ i Vercel-dashboardet. Bekræftet indirekte: edge injicerer kun insights-scriptet når toggle'en er sat, og stien svarer med det rigtige script.
+- [x] ~~**Verificér i produktion.**~~ Målt 2026-09-06: `200 application/javascript`, 3106 bytes.
   ```bash
   curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
     https://rangefinderapp.vercel.app/_vercel/insights/script.js
   ```
-  Skal give JavaScript. Giver den `text/html`, sluger en rute stadig stien, og `handle: filesystem` i `vercel.json` virkede ikke.
-
-  Målt 2026-09-06 efter deploy: `200 text/html`, 147157 bytes — samme som en ukendt sti. Det er **forventet mens Web Analytics er slået fra**, for så findes stien slet ikke og catch-all'en fanger den med rette. Testen er derfor først meningsfuld efter toggle'en, og routing-rettelsen er indtil videre ubekræftet i produktion.
-- [ ] **Del linket med fem rigtige folk.** Det er CEO-planens Gate 0, og det er stadig ikke gjort.
+  Giver den `text/html`, sluger en rute stien igen — så er catch-all'en eller `handle: filesystem` blevet rørt.
+- [x] ~~**`@vercel/analytics` fjernet igen.**~~ Lå ucommittet efter et `npm i` uden at nogen kode importerede den. Appen bruger `window.va`-shimmen og et `<script src>`-tag i `index.html`.
+- [ ] **Del linket med fem rigtige folk.** Det er CEO-planens Gate 0, det er stadig ikke gjort, og det er nu den eneste blokering for at kunne afgøre C.
 - [ ] `replan_used` er det eneste event der ikke er testet — det kræver API'et og sprungne uger.
 
 ---
@@ -28,7 +28,7 @@ Målingen er bygget og committet lokalt (se Færdigt). Den mangler to ting for a
 
 **Afgør dette først:** CEO-planen spørger om AI-planer beviseligt er bedre end algoritme-planer, og svarer ikke. Der er endnu ikke én rigtig bruger der har gennemført en plan. C er det dyreste stykke arbejde i planen og svært at rulle tilbage når der først ligger brugerdata i en database — så spørgsmålet bør besvares før, ikke efter.
 
-Målingen er nu på plads til at besvare det. Den skal bare deployes og køre længe nok.
+Målingen kører nu og kan besvare det. Den mangler kun rigtige brugere og tid.
 
 C bringer også ting ind som ikke er tekniske: persondata gør dig til databehandler (GDPR, sletning, privatlivspolitik), og implicit auth flow (token i URL-hash) blev accepteret som trade-off for B og skal genbesøges.
 
@@ -50,9 +50,9 @@ C bringer også ting ind som ikke er tekniske: persondata gør dig til databehan
 
 ## Små forbedringer
 
-- [ ] **Nøgletallene på TAL-fanen kunne blive en `<dl>`.** De fire tal er `<div>`-par. De læses forståeligt op som "0 Km kørt", så det er en forbedring, ikke en fejl.
+- [x] ~~**Nøgletallene på TAL-fanen kunne blive en `<dl>`.**~~ Lavet 2026-09-06, `fbaea72`. `dt` står før `dd` i DOM'en, og `flex-direction:column-reverse` viser tallet først uden at bytte om på markup'en.
 - [ ] **Måldistance-heuristikken rammer 12-13 af 14.** Ratio længste træning / forventet 80%: mest 1,0, med enkelte på 0,63-0,75 og én på 1,25. Fungerer, men er ikke præcis.
-- [x] ~~**Længdegrænsen for delelinks er ikke testet ordentligt.**~~ Målt 2026-09-06 på en rigtig AI-plan fra produktion — se `HANDOFF.md` → Delelink. Den gzippede sti topper på **3249 tegn, 41% af loftet**, på den største plan appen kan lave. Ingen risiko.
+- [x] ~~**Længdegrænsen for delelinks er ikke testet ordentligt.**~~ Målt 2026-09-06 på en rigtig AI-plan fra produktion. Den gzippede sti topper på **3249 tegn, 41% af loftet**, på den største plan appen kan lave. Ingen risiko.
 
   Men målingen fandt noget andet: **fallback-stien uden gzip krydser loftet mellem 80 og 90 sessioner** og lander på 9469 tegn (118%) ved max. På en browser uden `CompressionStream` kan store planer altså ikke deles. Fejlen er pæn — brugeren får "denne plan er for lang til at deles som link" — men kodekommentaren påstod det modsatte og er rettet.
 
@@ -73,7 +73,7 @@ C bringer også ting ind som ikke er tekniske: persondata gør dig til databehan
 
 ### Måling (2026-09-06)
 - Seks Vercel Web Analytics-events: `plan_generated`, `plan_fallback`, `session_logged`, `replan_used`, `plan_shared`, `plan_exported`. Cookieless, anonyme, ingen persondata. Se `HANDOFF.md` for tabellen
-- **`vercel.json` skulle rettes først:** legacy `routes` springer filsystemet over, så SPA-catch-all'en slugte `/_vercel/insights/script.js` og serverede `index.html` (målt: 200, `text/html`, 144661 bytes). Uden `handle: filesystem` ville browseren have parset SPA'en som JavaScript og målingen aldrig virket, uden en fejl nogen steder
+- **`vercel.json` skulle rettes:** legacy `routes` springer filsystemet over, så SPA-catch-all'en slugte `/_vercel/insights/script.js` og serverede `index.html` (målt: 200, `text/html`, 144661 bytes). Browseren ville have parset SPA'en som JavaScript og målingen aldrig virket, uden en fejl nogen steder. `handle: filesystem` var det første forsøg og var **ikke** nok; rettelsen er en negativ lookahead i catch-all'en selv (`49202aa`). Se `HANDOFF.md`
 - `plan_fallback.reason` har også en pengevinkel: når `validatePlan()` afviser et svar, er der allerede betalt for de output-tokens, prøvet igen, og serveret algoritme-planen. Det var usynligt før
 - Verificeret lokalt gennem wizarden: alle events fyrer med de rigtige payloads, et fjernet kryds logger ingenting, og log-knappen renderes kun for sessioner der ikke er færdige
 

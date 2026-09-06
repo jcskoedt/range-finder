@@ -5,7 +5,7 @@ Sidst opdateret: 2026-09-06
 
 En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, måldistance, niveau og enten et antal uger eller en løbsdato; Claude Haiku genererer en plan med faser, sessioner og coach-noter. Planen bor i browserens localStorage. Ingen konti, ingen server-database.
 
-**Single-file SPA** — hele frontenden er `index.html` (3034 linjer, inkl. CSS og JS). Tre Vercel-funktioner i `api/`.
+**Single-file SPA** — hele frontenden er `index.html` (3090 linjer, inkl. CSS og JS). Tre Vercel-funktioner i `api/`.
 
 ---
 
@@ -22,11 +22,11 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Kalender-eksport (.ics) | virker |
 | Sprogskifter DA/EN | hele appen, inkl. AI-output |
 | Valideringsgate | 16/16 |
-| Måling (Vercel Web Analytics) | deployet, **venter på toggle i dashboardet** |
+| Måling (Vercel Web Analytics) | virker, verificeret i produktion 2026-09-06 |
 
 Tilbage: **C** (konti + cloud sync) og en håndfuld mindre punkter — se `TODOS.md`.
 
-Målingen er live i produktion, men samler ingenting før Web Analytics slås til i Vercel-dashboardet. Indtil da lægger `track()` events i `window.vaq`, køen tømmes aldrig, og der sker ellers ingenting.
+Målingen kører. Verificeret i produktion 2026-09-06: `/_vercel/insights/script.js` svarer `200 application/javascript`, 3106 bytes — det rigtige script, ikke SPA'en. Det bekræfter både routing-rettelsen og at toggle'en er sat, for edge injicerer kun scriptet når Web Analytics er slået til.
 
 ---
 
@@ -131,7 +131,9 @@ Over ~100 sessioner (uger × sessioner/uge) returnerer Haiku det forkerte antal 
 ### Legacy `routes` springer filsystemet over — catch-all'en slugte analytics-scriptet
 `vercel.json` bruger `builds` og dermed legacy `routes`, og de tjekker ikke filsystemet af sig selv. Derfor de eksplicitte ruter til `logo.png`, `icon.svg` og resten — og derfor slugte SPA-catch-all'en `/_vercel/insights/script.js` og serverede `index.html` i stedet. Målt før rettelsen: 200, `text/html`, 144661 bytes, præcis som en ukendt sti.
 
-Browseren ville have parset hele SPA'en som JavaScript, og målingen ville aldrig have virket — uden en fejl nogen steder. `{ "handle": "filesystem" }` før catch-all'en løser det. Samme familie som "alle `/api/*` gav 404 siden første commit".
+Browseren ville have parset hele SPA'en som JavaScript, og målingen ville aldrig have virket — uden en fejl nogen steder. Samme familie som "alle `/api/*` gav 404 siden første commit".
+
+`{ "handle": "filesystem" }` før catch-all'en var det første forsøg, og **det var ikke nok:** filsystem-fasen matcher kun rigtige filer i build-outputtet, og insights-scriptet injiceres af edge, så den matchede aldrig. Rettelsen er at udelukke præfikset i catch-all'en selv — `"src": "/(?!_vercel/)(.*)"` — for det afhænger ikke af den forskel.
 
 Tjek en platform-sti sådan her, ikke ved at kigge på konfigurationen:
 ```bash
@@ -161,7 +163,7 @@ Screenshot-importen blev engang efterladt uden `wireUploadArea()`, og `api/scan.
 
 1. **Er AI-planer bedre end algoritme-planer?** CEO-planen stiller spørgsmålet og besvarer det ikke. Der er endnu ikke én rigtig bruger der har gennemført en plan. **Det bør afgøres før C** — C er det dyreste stykke arbejde i planen og svært at rulle tilbage, når der først ligger brugerdata i en database.
 
-   Målingen er nu i koden, men ikke deployet. Når den kører, er `session_logged` delt på `source` det tætteste svar uden at spørge folk: krydser AI-brugere flere sessioner af over flere uger end algoritme-brugere, betyder planen noget. CEO-planens Gate 0 — fem rigtige brugere der laver en plan og logger en session — aflæses på `plan_generated` og `session_logged`.
+   Målingen kører nu i produktion. Når der er data, er `session_logged` delt på `source` det tætteste svar uden at spørge folk: krydser AI-brugere flere sessioner af over flere uger end algoritme-brugere, betyder planen noget. CEO-planens Gate 0 — fem rigtige brugere der laver en plan og logger en session — aflæses på `plan_generated` og `session_logged`.
 2. **Fase-tabellens hul for uge 21-24.** Reglen siger "tilføj 1 BASE-uge, maks 8 BASE-uger totalt", men ikke hvad der sker når loftet er nået og planen skal være længere. Koden forlænger bare BASE videre. Kræver en rigtig coach — en kandidatregel er at forlænge BUILD i stedet, men det er et gæt.
 3. **Sikkerhed ved C.** Implicit auth flow (token i URL-hash) blev accepteret som trade-off for B. Skal genbesøges.
 
@@ -206,7 +208,7 @@ Kald der afvises før modellen (400, 422, 429) og alt mod den lokale stub-server
 | `api/scan.js` | Screenshot → aktiviteter |
 | `scripts/validate-generate.mjs` | Prompt-gate, 16 samples, exit 0/1 |
 | `scripts/sweep-plan-length.mjs` | Finder hvor lange planer knækker |
-| `vercel.json` | Routing. Bruger det gamle `builds`-format — `functions` og `builds` udelukker hinanden. `handle: filesystem` skal blive stående før catch-all'en |
+| `vercel.json` | Routing. Bruger det gamle `builds`-format — `functions` og `builds` udelukker hinanden. catch-all'en skal blive stående som `/(?!_vercel/)(.*)`, ellers sluger den `/_vercel/*` |
 | `.vercelignore` | Vercel læser ikke `.gitignore` |
 | `TODOS.md` | Opgaveliste med begrundelser og fravalg |
 | `CLAUDE.md` | Instruktioner til AI-assistenter i dette repo |
