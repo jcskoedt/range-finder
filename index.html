@@ -2002,6 +2002,11 @@ function wireAuthBox(){
 // a failure delays the backup and never costs the user anything.
 
 let syncTimer=null,retryTimer=null,retryDelay=2000,syncBaseVersion=0,syncInFlight=false;
+// Nothing may sync before the local library has been read off disk. Without
+// this, clicking a magic link fires onAuthStateChange while planIndex is still
+// empty: buildDoc sends an empty document and applyDoc writes the empty result
+// back, unlinking every plan the browser already had.
+let libraryReady=false;
 
 async function buildDoc(){
   const plans={};
@@ -2018,6 +2023,17 @@ async function applyDoc(doc){
   applyingRemote=true;
   try{
   const plans=(doc&&doc.plans)||{};
+  const tombs=(doc&&doc.tombstones)||{};
+  // A plan only leaves the library when something says it was deleted. The
+  // merged document is normally a superset of what is here, but "normally" is
+  // not a guarantee worth betting a training log on, so anything local that is
+  // not tombstoned is kept even if the response omits it.
+  for(const meta of state.planIndex){
+    if(!plans[meta.id]&&!tombs[meta.id]){
+      const kept=state.planCache[meta.id]||await loadPlan(meta.id);
+      if(kept)plans[meta.id]=kept;
+    }
+  }
   const ids=Object.keys(plans);
   for(const id of ids){state.planCache[id]=plans[id];await savePlan(plans[id]);}
   state.planIndex=ids.map(id=>{
@@ -2054,6 +2070,11 @@ function scheduleRetry(){
 
 async function syncNow(reason){
   if(!state.session||!sb||syncInFlight)return;
+  if(!libraryReady){
+    // Try again once init() has finished loading the library.
+    scheduleSync();
+    return;
+  }
   syncInFlight=true;
   const sentAtRev=localRev;
   setSyncState("saving");
@@ -3394,6 +3415,14 @@ function render(){
   syncLangToggle();
   document.documentElement.lang=lang;
   renderLibrary(true);
+  // The library has to be in memory before auth is wired: registering the
+  // listener is what makes detectSessionInUrl deliver the token from the hash,
+  // and that immediately triggers a sync.
+  sharedPlan=await readSharedPlan();
+  state.planIndex=await loadIndex();
+  libraryReady=true;
+  if(state.view==="library")renderLibrary(false);
+
   if(sb){
     try{
       const {data}=await sb.auth.getSession();
@@ -3409,9 +3438,7 @@ function render(){
       if(state.session&&!varLoggetInd)syncNow("login");
     });
   }
-  sharedPlan=await readSharedPlan();
-  state.planIndex=await loadIndex();
-  if(state.view==="library")renderLibrary(false);
+  render();
 })();
 </script>
 </body>
