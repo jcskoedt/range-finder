@@ -9,6 +9,10 @@ screenshots/
 *.md
 .DS_Store
 
+# Not part of the deploy: applied by hand in Supabase, and design docs
+supabase/
+docs/
+
 # Source assets that no route in vercel.json points at
 RANGE_FINDER_LOGO.png
 icon-1024.png

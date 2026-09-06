@@ -375,6 +375,24 @@ git commit -m "feat(sync): the merge, and a gate that proves it never drops a se
 
 ---
 
+## SPÆRRER FOR TASK 5 — fund fra gennemgangen af Task 3
+
+Adversarisk gennemgang af fletningen, 2026-09-06. Alle fire er verificeret i den kørende kode, ikke påstået. **Fletningen må ikke sættes i drift før de er lukket**, for de taber data i stilhed og opdages ikke af brugeren.
+
+**A. `updatedAt` findes ikke i klienten — nul forekomster i `index.html`.** Specen beskriver feltet; ingen task tilføjede det. `upd(c) > upd(s)` er derfor altid `0 > 0`, så **serverens kopi vinder altid planindholdet**. En replan lavet på én enhed rulles tilbage af en anden enheds ældre uger. Samme gælder `dateOverrides`.
+
+Værst: **gaten skjuler det.** Alle tre plan-tests giver et eksplicit `updatedAt` med. Der findes ingen test for den form produktionen faktisk har. Ret koden *og* tilføj en test hvor ingen side har `updatedAt`.
+
+**B. Der er et syvende skrivested til fremdrift.** `index.html:3095`, screenshot-importen, skriver `{done:true, actualKm, source}` uden `at`. Kommentaren ved `stampProgress` påstår seks. En importeret Strava-tur taber derfor til et hvilket som helst stemplet fjernet kryds, uanset alder.
+
+**C. Tombstone-reglen ødelægger tombstones.** Verificeret: `mergeTombstones({a:"2026-09-05"},{a:"2024-09-06"},nu)` giver `{}`. Tidligste-vinder vælger den ældste dato, hvorefter udløbet fjerner den — begge sider er enige om at planen er slettet, og resultatet indeholder ingen sletning. **Specen er også forkert her.** For en oplysning hvis eneste opgave er at overleve, er nyeste-vinder den rigtige regel.
+
+**D. Nulstil fremdrift kan ikke repræsenteres.** `index.html:3043` sætter `plan.progress={}`, men en foreningsmængde har ingen sletning, så hver server-post kommer tilbage. Nulstillingen holder i to sekunder. Rettelsen er at skrive stemplede `{done:false, actualKm:null, at}` for hver eksisterende nøgle i stedet for at rydde objektet.
+
+**E. Debounce-kapløb (hører til Task 7, ikke Task 3).** Klienten erstatter sit lokale bibliotek med svaret. Krydser brugeren felt to af mens kaldet med felt ét er undervejs, overskriver svaret felt to før det er sendt. Vinduet er én rundtur, og at krydse flere felter af i træk er præcis hvordan en uges træning logges. Task 7 skal enten flette svaret ind i det aktuelle lokale dokument frem for at erstatte det, eller kassere svaret hvis der er skrevet lokalt siden kaldet blev sendt.
+
+---
+
 ## Task 4: Supabase-projekt og skema
 
 **Files:**
