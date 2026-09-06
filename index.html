@@ -1004,6 +1004,12 @@ details[open].psum-faq .psum-faq-toggle::after{content:'▴';}
 </head>
 <body>
 
+<!-- Vercel Web Analytics. The shim queues events fired before script.js lands;
+     the real script drains window.vaq once it loads. Both must stay above the
+     app script, and /_vercel/* must reach the filesystem — see vercel.json. -->
+<script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments);};</script>
+<script defer src="/_vercel/insights/script.js"></script>
+
 <div class="lang-toggle" id="langToggle">
   <button type="button" data-lang="da">DA</button>
   <button type="button" data-lang="en">EN</button>
@@ -1580,6 +1586,7 @@ async function runReplan(plan,sw){
     plan.replannedAt=new Date().toISOString().slice(0,10);
     await savePlan(plan);
     state.planCache[plan.id]=plan;
+    track("replan_used",{weeks_rewritten:out.weeks.length});
     planNotice=out.weeks.length===1?t("replan_done_one"):t("replan_done_many",{n:out.weeks.length});
     openWeekIdx=null;
     render();
@@ -1812,6 +1819,14 @@ function apiPlanToLocalPlan(apiPlan,wiz){
     progress:{}
   };
 }
+
+/* ---------------- ANALYTICS ---------------- */
+// Custom events for Vercel Web Analytics. Wrapped because analytics is never
+// worth an exception in the middle of saving a plan — an adblocker, a private
+// window or a cold deploy all leave window.va undefined, and every call site
+// below sits in a path the user cares about.
+// Nothing here identifies anyone: no free text, no km values, no dates, no id.
+function track(name,data){try{if(window.va)window.va("event",{name:name,data:data});}catch(e){}}
 
 /* ---------------- STORAGE ---------------- */
 const INDEX_KEY="plans-index";
@@ -2198,7 +2213,7 @@ function renderWizard(){
     },2000);
 
     // The loading screen now waits for the real answer instead of a fixed timer.
-    let plan=null,notice=null;
+    let plan=null,notice=null,fallbackReason=null;
     try{
       const ctrl=new AbortController();
       const abortTimer=setTimeout(()=>ctrl.abort(),AI_GENERATE_TIMEOUT_MS);
@@ -2222,19 +2237,28 @@ function renderWizard(){
         });
       }finally{clearTimeout(abortTimer);}
       if(res.ok){
+        // If the transform throws, the catch below cannot tell a malformed plan
+        // from a network failure — so name it here and clear it once the plan
+        // is actually in hand.
+        fallbackReason="malformed";
         plan=apiPlanToLocalPlan(await res.json(),{sport:state.wizardSport,target,sessionsPerWeek:sessions,startDate,raceDate});
         // WEEKS_OPTIONS goes to 52 weeks but the API caps plans at 24, so say so
         // rather than silently handing back a shorter plan than was asked for.
         if(plan.capped)notice=t("notice_capped",{n:plan.weeksAvailable});
+        fallbackReason=null;
       }else{
         let err=null;try{err=await res.json();}catch(e){}
         console.warn("[generate] HTTP "+res.status+" "+((err&&err.error)||""));
         if(res.status===429)notice=t("notice_ratelimit");
         else if(err&&err.error==="plan_too_large")notice=t("notice_too_large");
+        // Kept to a small fixed set — a raw status code per event would spray
+        // the dashboard with one-off values and answer nothing.
+        fallbackReason=res.status===429?"http_429":(err&&err.error==="plan_too_large")?"plan_too_large":"http_error";
       }
     }catch(e){
       // Network failure, the abort above, or a malformed plan — all fall back.
       console.warn("[generate] "+(e&&e.name==="AbortError"?"timed out after "+AI_GENERATE_TIMEOUT_MS+"ms":e));
+      fallbackReason=fallbackReason||(e&&e.name==="AbortError"?"timeout":"network");
     }
 
     clearInterval(msgInterval);
@@ -2244,6 +2268,11 @@ function renderWizard(){
       const wk=generatePlan(state.wizardSport,target,weeks,sessions,longest,minSession);
       plan={id:"p"+Date.now(),sport:state.wizardSport,label:target+" km "+SPORTS[state.wizardSport].label.toLowerCase(),target,weeksAvailable:weeks,sessionsPerWeek:sessions,startDate,raceDate:raceDate||null,createdAt:new Date().toISOString().slice(0,10),generatedBy:"algorithm",weeks:wk,progress:{}};
     }
+
+    // Gate 0 lives on these two lines: plan_generated says a plan was made,
+    // plan_fallback says the AI path was paid for and not delivered.
+    if(fallbackReason)track("plan_fallback",{reason:fallbackReason});
+    track("plan_generated",{source:plan.generatedBy,sport:plan.sport,weeks:plan.weeksAvailable,sessions_per_week:plan.sessionsPerWeek,lang:lang});
 
     planNotice=notice;
     await savePlan(plan);
@@ -2802,6 +2831,7 @@ function renderTabPlan(plan,c){
   if(icsBtn)icsBtn.onclick=()=>{
     const hint=document.getElementById("shareHint");
     const n=downloadIcs(plan);
+    track("plan_exported",{events:n});
     hint.textContent=!n?t("export_ical_none"):n===1?t("export_ical_done_one"):t("export_ical_done_many",{n:n});
   };
 
@@ -2810,6 +2840,7 @@ function renderTabPlan(plan,c){
     const hint=document.getElementById("shareHint");
     const url=shareUrl!==undefined?shareUrl:await buildShareUrl(plan);
     if(!url){hint.textContent=t("share_too_long");return;}
+    track("plan_shared",{});
     let copied=false;
     try{await navigator.clipboard.writeText(url);copied=true;}catch(e){}
     if(!copied)copied=legacyCopy(url);
@@ -2851,6 +2882,8 @@ function renderTabPlan(plan,c){
       const ikey=cb.dataset.cb,wIdx=parseInt(cb.dataset.weekidx),i=parseInt(cb.dataset.i),km=parseFloat(cb.dataset.km);
       const cur=plan.progress[ikey]||{done:false,actualKm:null};
       cur.done=!cur.done;if(cur.done&&(cur.actualKm==null||cur.actualKm===''))cur.actualKm=km;
+      // Only the transition into done counts. Unticking is not a logged session.
+      if(cur.done)track("session_logged",{week_idx:wIdx,source:plan.generatedBy||"unknown"});
       plan.progress[ikey]=cur;await savePlan(plan);renderTabPlan(plan,c);
     };
   });
@@ -2871,7 +2904,11 @@ function renderTabPlan(plan,c){
       e.stopPropagation();
       const ikey=btn.dataset.logbtn,wIdx=parseInt(btn.dataset.weekidx),i=parseInt(btn.dataset.i),km=parseFloat(btn.dataset.km);
       const cur=plan.progress[ikey]||{done:false,actualKm:null};
+      // This button sets done unconditionally, so count the transition, not the
+      // click — otherwise re-logging an already-done session inflates the number.
+      const wasDone=cur.done;
       cur.done=true;if(!cur.actualKm||cur.actualKm==='')cur.actualKm=km;
+      if(!wasDone)track("session_logged",{week_idx:wIdx,source:plan.generatedBy||"unknown"});
       plan.progress[ikey]=cur;await savePlan(plan);openItemKey=null;renderTabPlan(plan,c);
     };
   });

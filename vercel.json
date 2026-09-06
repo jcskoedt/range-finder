@@ -11,6 +11,7 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1.js" },
+    { "handle": "filesystem" },
     { "src": "/logo.png", "dest": "/logo.png" },
     { "src": "/icon.svg", "dest": "/icon.svg" },
     { "src": "/landing-hero-mockup.html", "dest": "/landing-hero-mockup.html" },
