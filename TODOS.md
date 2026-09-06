@@ -26,6 +26,8 @@ Målingen kører i produktion. Tilbage er at få rigtige folk igennem den:
 
 ## Næste større stykke: C — konti og cloud sync
 
+**Designet er skrevet:** `docs/superpowers/specs/2026-09-06-c-cloud-sync-design.md`. Ti beslutninger, datamodel, fletteregler, synkroniseringsflow og testtilfælde. Læs den før du rører C.
+
 **Afgør dette først:** CEO-planen spørger om AI-planer beviseligt er bedre end algoritme-planer, og svarer ikke. Der er endnu ikke én rigtig bruger der har gennemført en plan. C er det dyreste stykke arbejde i planen og svært at rulle tilbage når der først ligger brugerdata i en database — så spørgsmålet bør besvares før, ikke efter.
 
 Målingen kører nu og kan besvare det. Den mangler kun rigtige brugere og tid.
