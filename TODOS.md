@@ -52,7 +52,11 @@ C bringer også ting ind som ikke er tekniske: persondata gør dig til databehan
 
 - [ ] **Nøgletallene på TAL-fanen kunne blive en `<dl>`.** De fire tal er `<div>`-par. De læses forståeligt op som "0 Km kørt", så det er en forbedring, ikke en fejl.
 - [ ] **Måldistance-heuristikken rammer 12-13 af 14.** Ratio længste træning / forventet 80%: mest 1,0, med enkelte på 0,63-0,75 og én på 1,25. Fungerer, men er ikke præcis.
-- [ ] **Længdegrænsen for delelinks er ikke testet ordentligt.** Grænsen på 8000 tegn er kun ramt af syntetiske planer, som gzip komprimerer urealistisk godt (en 24-ugers testplan gav 940 tegn). En rigtig 24-ugers plan bør måles.
+- [x] ~~**Længdegrænsen for delelinks er ikke testet ordentligt.**~~ Målt 2026-09-06 på en rigtig AI-plan fra produktion — se `HANDOFF.md` → Delelink. Den gzippede sti topper på **3249 tegn, 41% af loftet**, på den største plan appen kan lave. Ingen risiko.
+
+  Men målingen fandt noget andet: **fallback-stien uden gzip krydser loftet mellem 80 og 90 sessioner** og lander på 9469 tegn (118%) ved max. På en browser uden `CompressionStream` kan store planer altså ikke deles. Fejlen er pæn — brugeren får "denne plan er for lang til at deles som link" — men kodekommentaren påstod det modsatte og er rettet.
+
+- [ ] **Beslut om raw-fallbacken skal gøre mere end at fejle pænt.** `CompressionStream` mangler kun i Safari under 16.4 og Firefox under 113, så gruppen er lille og krympende. Mulighederne er at lade den være, eller at droppe fallbacken helt og sige det direkte. Ingen af delene haster.
 - [ ] **Rate limiting** er en in-memory `Map`, 5 pr. IP pr. time, som nulstilles ved cold start. Opgrader til Vercel Firewall hvis der kommer reelt misbrug. Bevidst valg, ikke en mangel.
 
 ---

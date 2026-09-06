@@ -1693,8 +1693,21 @@ function downloadIcs(plan){
 /* ---------------- SHARE A PLAN AS A URL ---------------- */
 // A plan is ~4KB of JSON, which is 5.5KB of base64 — too long for a link people
 // will actually paste. Gzipping first gets it to ~2KB. The first character says
-// which encoding was used, so a browser without CompressionStream still
-// produces a link that any browser can read.
+// which encoding was used, so the reader knows how to decode it.
+//
+// Measured 2026-09-06 on a real 100-session plan from production (the largest
+// MAX_TOTAL_SESSIONS allows), stepping the same plan down week by week:
+//
+//   sessions   20    40    60    80    90   100
+//   gzip URL  1129  1669  2192  2660  2957  3249   <- 41% of the cap at worst
+//   raw  URL  2225  4105  5950  7726  8636  9469   <- over the cap from ~85
+//
+// So the gzip path is never at risk. The raw fallback is: above roughly 85
+// sessions it exceeds SHARE_MAX_URL and buildShareUrl returns null, and the
+// user is told the plan is too long to share. That only happens without
+// CompressionStream (Safari below 16.4, Firefox below 113). It fails cleanly,
+// but it does NOT produce a link — an earlier version of this comment claimed
+// it did.
 const SHARE_PARAM="p";
 const SHARE_MAX_URL=8000;
 

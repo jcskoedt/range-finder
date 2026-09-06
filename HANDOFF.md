@@ -22,11 +22,11 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Kalender-eksport (.ics) | virker |
 | Sprogskifter DA/EN | hele appen, inkl. AI-output |
 | Valideringsgate | 16/16 |
-| Måling (Vercel Web Analytics) | i koden, **ikke deployet endnu** |
+| Måling (Vercel Web Analytics) | deployet, **venter på toggle i dashboardet** |
 
 Tilbage: **C** (konti + cloud sync) og en håndfuld mindre punkter — se `TODOS.md`.
 
-Målingen er committet lokalt og venter på to ting: at Web Analytics slås til i Vercel-dashboardet, og et deploy. Før det er der stadig ingen tal.
+Målingen er live i produktion, men samler ingenting før Web Analytics slås til i Vercel-dashboardet. Indtil da lægger `track()` events i `window.vaq`, køen tømmes aldrig, og der sker ellers ingenting.
 
 ---
 
