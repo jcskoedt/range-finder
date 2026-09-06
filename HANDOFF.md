@@ -23,6 +23,7 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Sprogskifter DA/EN | hele appen, inkl. AI-output |
 | Valideringsgate | 16/16 |
 | Måling (Vercel Web Analytics) | virker, verificeret i produktion 2026-09-06 |
+| Cloud sync (valgfrit login) | virker, deployet 2026-09-06 — fletning ubekræftet med to rigtige browsere |
 
 Tilbage: **C** (konti + cloud sync) og en håndfuld mindre punkter — se `TODOS.md`.
 
@@ -119,6 +120,38 @@ Vercel Web Analytics, cookieless. Shim og script-tag ligger øverst i `<body>`; 
 Ingen fritekst, ingen km-værdier, ingen datoer, intet id. Der er ikke persondata i det.
 
 To ting der er nemme at få galt og allerede er håndteret: at fjerne et kryds logger ingenting, og log-knappen renderes kun for sessioner der ikke er færdige, så en session kan ikke tælles to gange.
+
+## Cloud sync
+
+Valgfrit login. localStorage er stadig det primære lager og skrives altid først; skyen er et spejl der kun tilføjer en sikkerhedskopi. Appen virker uændret uden konto.
+
+| Fil | Rolle |
+|---|---|
+| `api/sync.js` | Fletningen som rene funktioner, plus `POST /api/sync`. Fletningen eksporteres, så gaten kører den rigtige kode |
+| `scripts/validate-sync.mjs` | 19 konfliktsituationer, exit 0/1. **Kør den før du rører fletningen** |
+| `supabase/schema.sql` | Tabellen, RLS og `sync_library()`. Anvendes i hånden — intet migreringsværktøj |
+
+**Hele biblioteket er ét jsonb-dokument pr. bruger.** Ingen relationer, fordi der aldrig forespørges på tværs af planer eller brugere.
+
+**Fletteregler:** fremdrift pr. session, seneste `at` vinder. Post uden `at` tæller som ældst. Tombstone på én af siderne fjerner planen — sletning er endelig. Ellers vinder den plan med seneste `updatedAt` indholdet, og fremdrift flettes på tværs uanset hvilken side det var.
+
+**Migrering er ingen kode.** Første login er den første synkronisering mod et tomt dokument.
+
+### Det der kan tabe data, og hvordan det er hegnet
+
+Fletningen er den ene del af C der fejler i stilhed — en bruger opdager ikke at en session forsvandt, de tror de huskede forkert. Derfor er den rene funktioner testet uden browser og uden database.
+
+**Kapløbet mellem debounce og svar** er det skarpeste. Klienten må ikke bare erstatte sit bibliotek med svaret: skriver brugeren mens kaldet er undervejs, ville svaret slette det før det var sendt. Hver lokal skrivning hæver `localRev`, værdien fanges ved afsendelse, og svaret anvendes kun hvis den ikke har flyttet sig. Ellers kasseres svaret, `syncBaseVersion` bliver stående så næste runde stadig fletter, og der planlægges en ny.
+
+**`applyDoc` er hegnet med `applyingRemote`,** fordi den skriver gennem `savePlan` og ellers ville tælle sine egne skrivninger mod den tæller den sammenlignes med.
+
+**Fire fejl fundet ved en adversarisk gennemgang 2026-09-06**, alle lukket: `updatedAt` fandtes slet ikke i klienten så serveren altid vandt planindholdet; screenshot-importen var et syvende ustemplet skrivested; tombstone-reglen valgte den ældste dato og lod udløbet fjerne den, så en sletning begge sider var enige om forsvandt; og nulstil-fremdrift kunne ikke repræsenteres i en foreningsmængde.
+
+Den vigtigste lektie er ikke fejlene, men at **gaten skjulte den første.** Alle plan-tests gav et eksplicit `updatedAt` med, så den beviste noget om en dokumentform ingen havde. En gate der tester data der ikke findes, er værre end ingen gate, fordi den bliver troet.
+
+### Mailen er den skjulte forudsætning
+
+Supabases indbyggede mailserver sender **kun til medlemmer af projektets egen organisation**, med et loft på 2 i timen. Magic link virker derfor perfekt når du tester på dig selv og fejler for hver rigtig bruger, med `Email address not authorized` og ingen synlig fejl i appen. Custom SMTP via Resend er ikke valgfrit. Kilde: supabase.com/docs/guides/auth/auth-smtp.
 
 ## Det der kostede tid — læs dette før du ændrer noget
 

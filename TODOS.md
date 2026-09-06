@@ -46,12 +46,13 @@ C bringer også ting ind som ikke er tekniske. I dag gemmer appen nul persondata
 
 ### Resten
 
-- [ ] **Supabase-projekt: auth + Postgres.** Vælg **EU-region ved oprettelsen** — det kan ikke laves om bagefter uden migrering.
-- [ ] **Accepter Supabases databehandleraftale**, `supabase.com/legal/dpa`. Den skal accepteres, ikke bare læses.
+- [x] ~~**Supabase-projekt: auth + Postgres.**~~ Oprettet via Vercels Marketplace-integration, ref `pxbrkdymegmizyvaqude`. Skemaet er kørt: tabellen `libraries`, RLS-politikkerne, indekset og `sync_library()`. Kilden ligger i `supabase/schema.sql` — der er intet migreringsværktøj, så de to skal holdes i takt manuelt.
+- [ ] **Bekræft regionen er EU.** `settings/general` på projektet. DNS peger på AWS-europæisk adresseblok, men det er et indicium, ikke en bekræftelse — og det kan ikke ændres bagefter. Der ligger persondata i basen nu.
+- [ ] **Accepter Supabases databehandleraftale**, `supabase.com/legal/dpa`. Den skal accepteres, ikke bare læses. Aktuel nu — der findes en brugerkonto i basen.
 - [ ] **Privatlivspolitik og en slette-mig-funktion.** Findes ikke i appen i dag, og begge dele følger med i det øjeblik du gemmer en email.
-- [ ] Magic link auth (email, ingen adgangskode)
-- [ ] Cloud sync: planer og sessioner i Supabase i stedet for localStorage
-- [ ] `/api/migrate-plan` — flyt localStorage-planer over ved første login
+- [x] ~~Magic link auth (email, ingen adgangskode)~~ `fef2401`. Verificeret ende til ende 2026-09-06: link sendt, modtaget, klikket, session hydreret.
+- [x] ~~Cloud sync: planer og sessioner i skyen~~ `5fb6931`. Ikke *i stedet for* localStorage — localStorage forblev det primære lager, og skyen er et spejl. Det var beslutning 3.
+- [x] ~~`/api/migrate-plan`~~ **udgår.** Første login er bare den første synkronisering mod et tomt dokument, og fletningen klarer resten. Det fjerner også hele uuid-problemet CEO-planen brugte et afsnit på: `plan.id` forlader aldrig dokumentet.
 - [ ] **Email-felt i wizarden** — flyttet hertil fra B1. Teksten lover "gemmes når du logger ind", og der er intet login før C. En email i localStorage gør heller ikke migreringen lettere, for sign-in-flowet spørger alligevel. Bygges sammen med magic link auth.
 
 ---
