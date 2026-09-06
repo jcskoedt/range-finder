@@ -54,7 +54,9 @@ Skriv ikke en Jest-opsætning ind i projektet som en del af den her plan. Det er
 Bagudkompatibel og kan sendes ud alene. Jo før den er ude, jo mere fremdrift er tidsstemplet den dag skyen tændes.
 
 **Files:**
-- Modify: `index.html` — checkbox-handleren, log-knap-handleren, km-inputtets `onchange`
+- Modify: `index.html` — **seks** skrivesteder, ikke tre. PLAN-fanen: checkbox (`data-cb`), km-input (`data-inp`), log-knap (`data-logbtn`). IDAG-fanen i `renderTabToday`: `#todayLogBtn`, `#todayUndoBtn`, `#todayActKm`.
+
+  IDAG-fanen blev overset i første udkast af planen. `#todayUndoBtn` sætter `done=false`, og uden tidsstempel dér ville en fortrydelse altid tabe en fletning mod et gammelt kryds — netop testcase 2 i gaten.
 
 **Interfaces:**
 - Produces: fremdrifts-poster på formen `{done, actualKm, at}` hvor `at` er `new Date().toISOString()`. Task 3 fletter på `at`.
@@ -65,7 +67,7 @@ Bagudkompatibel og kan sendes ud alene. Jo før den er ude, jo mere fremdrift er
 grep -n "plan.progress\[ikey\]=cur\|cur.actualKm=e.target.value" index.html
 ```
 
-Forventet: tre steder — checkbox (`data-cb`), log-knap (`data-logbtn`), km-input (`data-inp`).
+Forventet: seks steder. Tre i `renderTabPlan` omkring linje 2930-2955, og tre i `renderTabToday` omkring linje 2645-2649. Rammer du kun tre, kigger du kun i PLAN-fanen.
 
 - [ ] **Step 2: Tilføj en hjælper ved siden af `track()`**
 
@@ -94,9 +96,19 @@ if(!wasDone)track("session_logged",{week_idx:wIdx,source:plan.generatedBy||"unkn
 plan.progress[ikey]=stampProgress(cur);await savePlan(plan);openItemKey=null;renderTabPlan(plan,c);
 ```
 
-Km-inputtet:
+Km-inputtet i PLAN-fanen:
 ```js
 cur.actualKm=e.target.value;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);
+```
+
+IDAG-fanens tre, som alle er enkeltlinjer i `renderTabToday`:
+```js
+// #todayLogBtn
+if(lb)lb.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=true;if(!cur.actualKm)cur.actualKm=km;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);renderTabToday(plan,c);};
+// #todayUndoBtn — fortrydelse skal stemples, ellers taber den altid en fletning
+if(ub)ub.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=false;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);renderTabToday(plan,c);};
+// #todayActKm
+if(kmI){kmI.onclick=(e)=>e.stopPropagation();kmI.onchange=async(e)=>{const cur=plan.progress[ikey]||{done:true};cur.actualKm=e.target.value;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);};}
 ```
 
 - [ ] **Step 4: Verificér i browseren**

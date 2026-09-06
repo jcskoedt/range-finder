@@ -1870,6 +1870,14 @@ function apiPlanToLocalPlan(apiPlan,wiz){
 // Nothing here identifies anyone: no free text, no km values, no dates, no id.
 function track(name,data){try{if(window.va)window.va("event",{name:name,data:data});}catch(e){}}
 
+/* ---------------- FREMDRIFT ---------------- */
+// Cloud sync afgør konflikter på hvornår en post blev skrevet. Uden det kan to
+// browsere ikke skilles ad: "krydset af på telefonen søndag" ser ud præcis som
+// "fjernet på laptoppen torsdag". Alle seks skrivesteder skal igennem den her,
+// også fortryd-knappen — en ustemplet fortrydelse taber altid mod et stemplet
+// kryds. Poster fra før feltet fandtes tæller som ældst.
+function stampProgress(entry){return Object.assign({},entry,{at:new Date().toISOString()});}
+
 /* ---------------- STORAGE ---------------- */
 const INDEX_KEY="plans-index";
 const STORAGE_TIMEOUT_MS=6000;
@@ -2642,11 +2650,11 @@ function renderTabToday(plan,c){
   if(ts){
     const[,km]=ts.item;const ikey=keyFor(ts.wIdx,ts.sIdx);
     const lb=document.getElementById("todayLogBtn");
-    if(lb)lb.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=true;if(!cur.actualKm)cur.actualKm=km;plan.progress[ikey]=cur;await savePlan(plan);renderTabToday(plan,c);};
+    if(lb)lb.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=true;if(!cur.actualKm)cur.actualKm=km;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);renderTabToday(plan,c);};
     const ub=document.getElementById("todayUndoBtn");
-    if(ub)ub.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=false;plan.progress[ikey]=cur;await savePlan(plan);renderTabToday(plan,c);};
+    if(ub)ub.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=false;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);renderTabToday(plan,c);};
     const kmI=document.getElementById("todayActKm");
-    if(kmI){kmI.onclick=(e)=>e.stopPropagation();kmI.onchange=async(e)=>{const cur=plan.progress[ikey]||{done:true};cur.actualKm=e.target.value;plan.progress[ikey]=cur;await savePlan(plan);};}
+    if(kmI){kmI.onclick=(e)=>e.stopPropagation();kmI.onchange=async(e)=>{const cur=plan.progress[ikey]||{done:true};cur.actualKm=e.target.value;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);};}
     // Wire move button
     const mb=document.getElementById("todayMoveBtn");
     if(mb)mb.onclick=()=>{
@@ -2927,7 +2935,7 @@ function renderTabPlan(plan,c){
       cur.done=!cur.done;if(cur.done&&(cur.actualKm==null||cur.actualKm===''))cur.actualKm=km;
       // Only the transition into done counts. Unticking is not a logged session.
       if(cur.done)track("session_logged",{week_idx:wIdx,source:plan.generatedBy||"unknown"});
-      plan.progress[ikey]=cur;await savePlan(plan);renderTabPlan(plan,c);
+      plan.progress[ikey]=stampProgress(cur);await savePlan(plan);renderTabPlan(plan,c);
     };
   });
   // Km inputs
@@ -2936,7 +2944,7 @@ function renderTabPlan(plan,c){
     inp.onchange=async(e)=>{
       const ikey=inp.dataset.inp;
       const cur=plan.progress[ikey]||{done:false,actualKm:null};
-      cur.actualKm=e.target.value;plan.progress[ikey]=cur;await savePlan(plan);
+      cur.actualKm=e.target.value;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);
       const lb=c.querySelector(`[data-logbtn="${ikey}"]`);
       if(lb)lb.textContent=t("mark_done",{km:fmtKm(e.target.value)});
     };
@@ -2952,7 +2960,7 @@ function renderTabPlan(plan,c){
       const wasDone=cur.done;
       cur.done=true;if(!cur.actualKm||cur.actualKm==='')cur.actualKm=km;
       if(!wasDone)track("session_logged",{week_idx:wIdx,source:plan.generatedBy||"unknown"});
-      plan.progress[ikey]=cur;await savePlan(plan);openItemKey=null;renderTabPlan(plan,c);
+      plan.progress[ikey]=stampProgress(cur);await savePlan(plan);openItemKey=null;renderTabPlan(plan,c);
     };
   });
 }
