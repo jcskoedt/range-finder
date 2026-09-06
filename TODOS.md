@@ -9,9 +9,16 @@ B1 (AI-plangenerering) og B2 (replan) er færdige og i produktion. Se `HANDOFF.m
 
 Målingen er bygget og committet lokalt (se Færdigt). Den mangler to ting for at give noget:
 
-- [ ] **Slå Web Analytics til** i Vercel-dashboardet. Toggle'en viser samtidig event-loftet på planen.
-- [ ] **Deploy.** Målingen kan først verificeres i produktion.
-- [ ] **Verificér efter deploy:** `curl -s -o /dev/null -w "%{http_code} %{content_type}\n" https://rangefinderapp.vercel.app/_vercel/insights/script.js` skal give JavaScript, ikke HTML. Generér så en plan live og se eventet lande.
+- [x] ~~**Deploy.**~~ Landet 2026-09-06, `ee79b8d`. Analytics-koden er live i produktion.
+- [ ] **Slå Web Analytics til** i Vercel-dashboardet. Toggle'en viser samtidig event-loftet på planen. **Indtil det sker samler målingen ingenting** — `track()` lægger events i `window.vaq`, køen tømmes aldrig, og der sker ellers ingenting. Ingen fejl for brugeren.
+- [ ] **Verificér når toggle'en er sat:**
+  ```bash
+  curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
+    https://rangefinderapp.vercel.app/_vercel/insights/script.js
+  ```
+  Skal give JavaScript. Giver den `text/html`, sluger en rute stadig stien, og `handle: filesystem` i `vercel.json` virkede ikke.
+
+  Målt 2026-09-06 efter deploy: `200 text/html`, 147157 bytes — samme som en ukendt sti. Det er **forventet mens Web Analytics er slået fra**, for så findes stien slet ikke og catch-all'en fanger den med rette. Testen er derfor først meningsfuld efter toggle'en, og routing-rettelsen er indtil videre ubekræftet i produktion.
 - [ ] **Del linket med fem rigtige folk.** Det er CEO-planens Gate 0, og det er stadig ikke gjort.
 - [ ] `replan_used` er det eneste event der ikke er testet — det kræver API'et og sprungne uger.
 
