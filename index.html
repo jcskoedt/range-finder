@@ -3437,6 +3437,11 @@ function render(){
       // empty document and the merge does the rest. No separate endpoint.
       if(state.session&&!varLoggetInd)syncNow("login");
     });
+    // And on every load with a session already in hand. Without this the client
+    // only ever pushes: another device change is invisible until this one
+    // happens to write something locally. Measured — device B ticked 0_1, the
+    // server held both, and a reload here still showed only 0_0.
+    if(state.session)syncNow("load");
   }
   render();
 })();
