@@ -124,33 +124,84 @@ grant execute on function sync_library(uuid, jsonb, bigint) to service_role;
 -- Task 10: the retention rule.
 --
 -- /privacy promises that an inactive account is warned after 11 months and
--- deleted after 12. Only the deletion half is here. The warning is an Edge
--- Function that needs Resend, so until that exists the page promises a mail
--- nobody sends. Nothing is at risk yet — the sweep cannot reach an account
--- until 12 months after its last sign-in and the database has no users — but
--- the warning has to exist before the first account gets that old.
+-- deleted after 12. Both halves are here now, except the thing that actually
+-- puts mail in the air: api/retention-warn.js is written and wired to a daily
+-- Vercel Cron, but it no-ops until RESEND_API_KEY and RESEND_FROM exist.
+--
+-- The deletion is gated on the warning. sweep_inactive() will not touch an
+-- account that has no warning on record and thirty days since it, so while the
+-- sender is unconfigured the outcome is that nothing is deleted — not that
+-- someone is deleted having never heard from us. That is the safe direction to
+-- fail in, but it is still a promise unkept, so it is countable rather than
+-- silent: retention_status().overdue_unwarned is the number of accounts past
+-- the deletion date and alive only because nobody warned them. It should be 0.
 
 create extension if not exists pg_cron;
 
--- Two deliberate departures from the plan's version of this function.
+-- One row per warned account, and a table rather than a column on libraries
+-- because an account that signed in and never synced has no libraries row and
+-- still has to be warnable. RLS on with no policies, like libraries: nothing
+-- reaches this with anything but the service role.
+
+create table if not exists retention_warnings (
+  user_id   uuid primary key references auth.users(id) on delete cascade,
+  warned_at timestamptz not null default now(),
+  email_id  text
+);
+
+comment on table retention_warnings is
+  'One row per warned account. A separate table rather than a column on libraries because an account that signed in and never synced has no libraries row and still has to be warnable.';
+
+alter table retention_warnings enable row level security;
+revoke all on table retention_warnings from anon, authenticated;
+
+-- ONE definition of "inactive", three consumers: the sweep, the status
+-- readout, and the endpoint that sends the warning. Two definitions would
+-- drift, and drift here means either mailing someone who is active or deleting
+-- someone who was never warned. This project has already been bitten twice by
+-- a document and a database disagreeing; this is the same class of mistake, so
+-- the expression exists exactly once.
 --
--- The plan wrote `delete from auth.users u using libraries l where
--- l.user_id = u.id and l.last_seen_at < ...`. A user who signs in and never
--- makes a plan has no libraries row, so that join never matches them and the
--- account stands forever holding an email address — the one thing the policy
--- promises to get rid of. coalesce() falls back to the account's own dates.
+-- greatest() over both signals rather than last_seen_at alone: last_seen_at is
+-- touched on every sync and is the sharper one, but if the sync loop ever
+-- stops touching it, an active account would read as silent. coalesce() to
+-- created_at because an account with no libraries row still has to be counted
+-- — the plan's version joined libraries and would have left those standing
+-- forever, holding the one thing the policy promises to remove.
+
+create or replace view retention_accounts as
+select
+  u.id    as user_id,
+  u.email::text as email,
+  greatest(coalesce(l.last_seen_at, u.created_at),
+           coalesce(u.last_sign_in_at, u.created_at)) as inactive_since,
+  w.warned_at as warned_at
+from auth.users u
+left join libraries l          on l.user_id = u.id
+left join retention_warnings w on w.user_id = u.id;
+
+-- The view reads auth.users and carries email addresses. It runs with the
+-- owner's rights, so it must not be reachable by anon or authenticated.
+revoke all on retention_accounts from public, anon, authenticated;
+grant select on retention_accounts to service_role;
+
+-- `warned_at >= inactive_since` is the rule that handles a user who came back.
+-- Sign in again and inactive_since jumps forward past the old warning, so the
+-- stale warning stops counting and a fresh silence needs a fresh warning. It
+-- is also why retention_warnings is never cleaned up on sync: it does not need
+-- to be, and a delete inside sync_library would be one more write on the hot
+-- path that could fail quietly.
 --
--- And greatest() over both signals, not last_seen_at alone: last_seen_at is
--- touched on every sync and is the sharper signal, but if the sync loop ever
--- stops touching it, an active account would look silent. An account survives
--- if either signal is recent. Deleting someone's data by accident is the
--- failure that cannot be undone, so the rule leans that way on purpose.
+-- Thirty days is the gap the policy itself describes — warned at eleven
+-- months, deleted at twelve. It is measured from the warning rather than from
+-- the eleven-month mark so that an account warned late still gets its month.
 --
 -- No security definer, unlike sync_library. pg_cron runs the job as postgres,
--- which already has the rights, and a security-definer mass-delete reachable
+-- which already has the rights, and a security-definer mass delete reachable
 -- over PostgREST is exactly the door the sync_library revoke exists to shut.
--- The revoke below is the second lock: without it PUBLIC keeps the EXECUTE
--- that Postgres grants by default.
+-- The revoke below is the second lock, and it includes service_role: Supabase
+-- grants it EXECUTE on every new function in public by default, and no
+-- endpoint calls this — only cron does.
 
 create or replace function sweep_inactive()
 returns void
@@ -159,34 +210,104 @@ set search_path = ''
 as $$
 begin
   delete from auth.users u
-   where greatest(
-           coalesce((select l.last_seen_at from public.libraries l
-                      where l.user_id = u.id), u.created_at),
-           coalesce(u.last_sign_in_at, u.created_at)
-         ) < now() - interval '12 months';
+   using public.retention_accounts a
+   where a.user_id = u.id
+     and a.inactive_since < now() - interval '12 months'
+     and a.warned_at is not null
+     and a.warned_at >= a.inactive_since
+     and a.warned_at <= now() - interval '30 days';
 end;
 $$;
 
-revoke all on function sweep_inactive() from public, anon, authenticated;
+revoke all on function sweep_inactive() from public, anon, authenticated, service_role;
 
--- And from service_role, unlike sync_library. Supabase's default privileges
--- hand service_role EXECUTE on every new function in public, so the revoke
--- above left it holding a mass delete it has no use for — no endpoint calls
--- this, only cron does, as postgres. The service key can already delete rows
--- directly, so this is not a hole being closed; it is one fewer thing a leaked
--- key can reach in a single call. Verified in pg_proc.proacl afterwards:
--- {postgres=X/postgres}, nothing else.
-revoke all on function sweep_inactive() from service_role;
+-- What the sender reads. It deliberately does NOT stop at twelve months: if
+-- the sender has been down, accounts drift past the deletion date unwarned,
+-- and a window that ended at twelve months would never warn them — so they
+-- would live forever and the policy would silently never apply to them. Warn
+-- everything quiet for eleven months or more that has no current warning, and
+-- let the thirty days run from there.
+
+create or replace function retention_warn_due(p_limit int default 50)
+returns table(user_id uuid, email text)
+language sql
+set search_path = ''
+as $$
+  select a.user_id, a.email
+    from public.retention_accounts a
+   where a.inactive_since < now() - interval '11 months'
+     and (a.warned_at is null or a.warned_at < a.inactive_since)
+   order by a.inactive_since
+   limit p_limit;
+$$;
+
+revoke all on function retention_warn_due(int) from public, anon, authenticated;
+grant execute on function retention_warn_due(int) to service_role;
+
+-- Called by the endpoint only after Resend has accepted the mail, never
+-- before. Recording first would let a failed send count as a warning, and
+-- thirty days later the account goes without anyone having heard from us.
+
+create or replace function retention_mark_warned(p_user_id uuid, p_email_id text default null)
+returns void
+language sql
+set search_path = ''
+as $$
+  insert into public.retention_warnings (user_id, warned_at, email_id)
+  values (p_user_id, now(), p_email_id)
+  on conflict (user_id) do update set warned_at = now(), email_id = excluded.email_id;
+$$;
+
+revoke all on function retention_mark_warned(uuid, text) from public, anon, authenticated;
+grant execute on function retention_mark_warned(uuid, text) to service_role;
+
+-- The readout that keeps the gap from being silent.
+--
+--   warn_due          quiet 11 months or more, no current warning -> should get mail
+--   warned_waiting    warned, inside the thirty days              -> nothing to do
+--   delete_due        past 12 months, warned, thirty days passed   -> next sweep takes these
+--   overdue_unwarned  past 12 months, never warned                 -> MUST BE 0
+--
+-- warn_due and overdue_unwarned overlap on purpose: overdue_unwarned is the
+-- subset already past the deletion date, alive only because the gate is
+-- holding. A number above zero means the sender is not running.
+
+create or replace function retention_status()
+returns table(warn_due bigint, warned_waiting bigint, delete_due bigint, overdue_unwarned bigint)
+language sql
+set search_path = ''
+as $$
+  select
+    count(*) filter (where a.inactive_since < now() - interval '11 months'
+                       and (a.warned_at is null or a.warned_at < a.inactive_since)),
+    count(*) filter (where a.warned_at is not null
+                       and a.warned_at >= a.inactive_since
+                       and a.warned_at > now() - interval '30 days'),
+    count(*) filter (where a.inactive_since < now() - interval '12 months'
+                       and a.warned_at is not null
+                       and a.warned_at >= a.inactive_since
+                       and a.warned_at <= now() - interval '30 days'),
+    count(*) filter (where a.inactive_since < now() - interval '12 months'
+                       and (a.warned_at is null or a.warned_at < a.inactive_since))
+  from public.retention_accounts a;
+$$;
+
+revoke all on function retention_status() from public, anon, authenticated;
+grant execute on function retention_status() to service_role;
 
 -- 03:00 on the first of the month. pg_cron reads cron expressions in UTC, not
 -- Europe/Copenhagen — it drifts an hour with daylight saving and that is fine
 -- for a monthly sweep. Named schedules upsert, so re-running this file does
--- not stack duplicate jobs. Whether a run happened, and whether it failed,
--- is in cron.job_run_details.
+-- not stack duplicate jobs. Whether a run happened, and whether it failed, is
+-- in cron.job_run_details.
+--
+-- The warning runs daily from Vercel Cron (see vercel.json), so by the time
+-- this monthly sweep fires, anyone due has had their thirty days.
 select cron.schedule('sweep-inactive', '0 3 1 * *', 'select public.sweep_inactive()');
 
--- Verification: supabase/verify-retention.sql, four cases, run by hand.
--- Applied and verified against the production database 2026-09-07: 4/4.
+-- Verification: supabase/verify-retention.sql — seven accounts, four status
+-- counts, one sweep. Applied and verified against the production database
+-- 2026-09-07: 7/7 and 4/4.
 
 -- Make PostgREST pick the change up now rather than whenever it next notices.
 notify pgrst, 'reload schema';

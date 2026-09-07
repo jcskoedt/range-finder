@@ -25,6 +25,14 @@ Den vigtigste, fordi DNS tager tid og fordi to andre punkter venter på den. Se 
 4. Samme sted, Rate Limits: loftet starter på 30 mails i timen efter custom SMTP. Skru op hvis det bliver for lidt.
 5. Test på en adresse der **ikke** er din egen og ikke er medlem af Supabase-organisationen. Det er hele pointen — på din egen virker det også uden Resend.
 
+Samme Resend-konto driver advarselsmailen i opbevaringsreglen, så når den er oprettet, mangler der tre env-variabler i Vercel (Production) før `api/retention-warn.js` gør andet end at tælle:
+
+6. `RESEND_API_KEY` — nøglen fra Resend.
+7. `RESEND_FROM` — afsenderadressen på det verificerede domæne, fx `Range Finder <ingen-svar@dit-domæne.dk>`.
+8. `CRON_SECRET` — en tilfældig streng, fx `openssl rand -hex 32`. Vercel sender den selv som `Authorization: Bearer …` til cron-jobbet. **Uden den nægter endpointet at køre** — en åben endpoint der sender mails er ikke noget man lader stå.
+
+Sig til når de tre er sat, så deployer vi og verificerer med et rigtigt kald i stedet for at læse konfigurationen.
+
 ### 3. Accepter Supabases databehandleraftale
 
 `supabase.com/legal/dpa`, eller dashboardet → organisationen → Settings → de juridiske dokumenter. Den skal **accepteres**, ikke bare læses: i det øjeblik der ligger en emailadresse i basen, er du dataansvarlig og Supabase din databehandler.
@@ -36,6 +44,12 @@ Basen er tom lige nu — slette-konto-testen 6/9 tog den ene konto med sig — s
 CEO-planens Gate 0. Stadig ikke gjort, og det er det eneste der kan besvare om AI-planer er bedre end algoritme-planer. Kan først gøres når nummer 2 er på plads — indtil da kan de ikke logge ind, og appen viser dem ikke nogen fejl.
 
 ### Og to ting mere du skal vide
+
+**Advarselsmailen er bygget, men den sender ingenting endnu.** `api/retention-warn.js` er skrevet, og `vercel.json` har fået et dagligt cron-job kl. 04:00 UTC. Uden `RESEND_API_KEY` og `RESEND_FROM` svarer den `200` med `skipped: "resend_not_configured"` og antallet der venter — med vilje, frem for at fejle: et cron-job der fejler hver dag i ugevis lærer dig at ignorere cron-fejl, og så er den rigtige fejl også usynlig.
+
+Sletningen er nu spærret bag advarslen: `sweep_inactive()` rører ikke en konto der ikke har en advarsel på sig og 30 dage siden. Så indtil afsenderen kører, sletter systemet **ingenting** — det er den rigtige retning at fejle i, men det er stadig et løfte der ikke holdes, så det er tælleligt frem for tavst: `retention_status().overdue_unwarned` er antallet af konti der er forbi slettedatoen og kun lever fordi ingen har advaret dem. Den skal være 0.
+
+Hverken endpointet eller cron-nøglen i `vercel.json` er verificeret mod produktion — der er ikke deployet. `vercel.json` har fejlet to gange på ét døgn i dette projekt, så den skal verificeres med et kald, ikke ved at læse filen. Går den i stykker, fejler næste deploy; produktionen bliver ved med at servere det sidste gode deploy, så det er en fejlet build, ikke et nedbrud.
 
 **`libraries` har RLS slået til og nul politikker.** De tre "own row"-politikker i `supabase/schema.sql` blev aldrig anvendt; fundet 2026-09-07 af Supabases egen advisor og bekræftet i `pg_policies`. Det er ikke et hul: RLS uden politikker nægter anon og authenticated alt, og `/api/sync` bruger service-rollen der springer RLS over, så appen er upåvirket. Filen er nu rettet til at sige det — politikkerne står kommenteret ud med hvorfor.
 
@@ -95,7 +109,9 @@ C bringer også ting ind som ikke er tekniske. I dag gemmer appen nul persondata
 - [x] ~~Magic link auth (email, ingen adgangskode)~~ `fef2401`. Verificeret ende til ende 2026-09-06: link sendt, modtaget, klikket, session hydreret.
 - [x] ~~Cloud sync: planer og sessioner i skyen~~ `5fb6931`. Ikke *i stedet for* localStorage — localStorage forblev det primære lager, og skyen er et spejl. Det var beslutning 3.
 - [x] ~~`/api/migrate-plan`~~ **udgår.** Første login er bare den første synkronisering mod et tomt dokument, og fletningen klarer resten. Det fjerner også hele uuid-problemet CEO-planen brugte et afsnit på: `plan.id` forlader aldrig dokumentet.
-- [ ] **Opbevaringsreglen (Task 10).** Sletningen kører — anvendt og verificeret 2026-09-07, 4/4. **Advarselsmailen (Step 2) mangler og kræver Resend**, så politikkens løfte holder kun halvt indtil da.
+- [ ] **Opbevaringsreglen (Task 10).** Databasesiden er færdig og verificeret 2026-09-07: `retention_warnings`, viewet `retention_accounts`, `sweep_inactive()` spærret bag advarslen, `retention_warn_due()`, `retention_mark_warned()` og `retention_status()`. `verify-retention.sql` dækker syv konti og fire tællere, 7/7 og 4/4, og skemafilens fire funktionskroppe er diffet mod databasen og er identiske.
+
+  Tilbage: **de tre env-variabler og et deploy.** Se *Kræver dig* øverst, punkt 2, trin 6-8.
 
   Planens egen version af `sweep_inactive()` er **ikke** den der blev skrevet. Den koblede `auth.users` til `libraries` med et join, og en bruger der logger ind uden nogensinde at lave en plan har ingen `libraries`-række — de konti ville stå for evigt med en emailadresse i, altså præcis det politikken lover at fjerne. Den skrevne version falder tilbage på kontoens egne datoer og kræver at **både** `last_seen_at` og `last_sign_in_at` er gamle, før den sletter.
 

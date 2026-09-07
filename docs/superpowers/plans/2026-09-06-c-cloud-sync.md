@@ -989,7 +989,7 @@ git commit -m "feat(gdpr): delete your account, and say what is stored"
 
 ## ◐ Task 10: Opbevaring — advarsel og sletning
 
-> **Step 1, 3 og 4 er kørt 2026-09-07. Step 2 mangler og kræver Resend.**
+> **Alle fire steps er bygget 2026-09-07. Tilbage er tre env-variabler og et deploy, så advarslen faktisk sender.**
 >
 > Den anvendte SQL er **ikke** den der står nedenfor. Joinet mod `libraries`
 > ville lade en konto uden bibliotek — signet ind, aldrig lavet en plan — stå
@@ -1020,9 +1020,19 @@ $$;
 select cron.schedule('sweep-inactive', '0 3 1 * *', 'select sweep_inactive()');
 ```
 
-- [ ] **Step 2: Advarsels-mailen**
+- [x] **Step 2: Advarsels-mailen** — bygget 2026-09-07, men **ikke** som beskrevet nedenfor, og den sender ingenting endnu.
 
-En Supabase Edge Function der kører dagen før og sender via Resend til brugere med `last_seen_at` mellem 11 og 12 måneder. Kræver Resend-nøglen som secret.
+Fire afvigelser, alle bevidste:
+
+**Vercel Cron + `api/retention-warn.js`, ikke en Supabase Edge Function.** Projektet har fire Node-funktioner i `api/`, service-nøglen ligger i Vercels env, og der er bevidst intet build-trin. En Edge Function ville trække Deno og supabase CLI ind for at gøre noget den eksisterende stak allerede gør. Prisen er en `crons`-nøgle i `vercel.json`, som er skrøbelig og skal verificeres med et kald.
+
+**Ikke "dagen før", men dagligt.** Det ville kræve at man kan regne ud hvilken dag der er dagen før for hver konto. Et dagligt job der samler alle op der er forbi 11 måneder uden gyldig advarsel, har ingen sådan kant.
+
+**Ikke `last_seen_at` mellem 11 og 12 måneder.** To grunde. En konto uden `libraries`-række har ingen `last_seen_at`, og et vindue der lukker ved 12 måneder ville aldrig nå de konti der driftede forbi mens afsenderen var nede — de ville leve for evigt, og politikken ville i tavshed aldrig gælde dem. Definitionen ligger nu ét sted, viewet `retention_accounts`, og `retention_warn_due()` har ingen øvre kant.
+
+**Sletningen er spærret bag advarslen** (besluttet 2026-09-07). `sweep_inactive()` rører ikke en konto uden en advarsel og 30 dage siden, og `retention_status().overdue_unwarned` gør det tælleligt hvis afsenderen holder op med at køre. Mailen er tosproget frem for lokaliseret: det synkroniserede dokument har intet sprogfelt — verificeret i `index.html`, hvor `language` sendes til API'et men aldrig gemmes på planen.
+
+Mangler: `RESEND_API_KEY`, `RESEND_FROM` og `CRON_SECRET` i Vercels Production-env, og et deploy. Uden dem svarer endpointet `200` med `skipped`.
 
 - [x] **Step 3: Verificér uden at vente et år** — erstattet af `supabase/verify-retention.sql`, 4/4.
 

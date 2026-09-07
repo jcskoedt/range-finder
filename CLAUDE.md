@@ -34,6 +34,8 @@ Begge exit 0/1. Senest 16/16 og 19/19.
 
 Fletnings-gaten kræver hverken nøgle eller netværk. Den findes fordi fletningen er den ene del af cloud sync der kan tabe data i stilhed — en bruger opdager ikke at en session forsvandt, de tror de huskede forkert.
 
+**Og opbevaringsreglen har sin egen.** Rører du `sweep_inactive()`, viewet `retention_accounts` eller `api/retention-warn.js`, så kør `supabase/verify-retention.sql` gennem Supabase-MCP'en — syv konti, fire tællere, ét sweep, én transaktion. Den hører til her af samme grund som fletningen: den sletter konti, og en fejl i den opdager ingen bruger. Senest 7/7 og 4/4.
+
 **Og husk hvad en gate ikke kan se.** Da fletningen blev skrevet, gav alle plan-tests et eksplicit `updatedAt` med, mens ingen plan i produktionen havde feltet. Gaten var grøn og beviste noget om en dokumentform ingen havde. Fire af dagens fem synkroniseringsfejl lå i *hvornår* fletningen blev kaldt, ikke i fletningen.
 
 

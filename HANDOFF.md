@@ -27,13 +27,19 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Privatlivspolitik | live på `/privacy`, med rigtige selskabsoplysninger |
 | Slet min konto | virker, verificeret: 204 og rækken væk via cascade |
 | Skrifttyper | selvhostet, ingen Google i anmodningskæden |
-| Opbevaringsregel (12 mdr.) | sletningen kører, verificeret 4/4 — **advarselsmailen mangler**, se nedenfor |
+| Opbevaringsregel (12 mdr.) | databasen er færdig og verificeret 7/7 — **afsenderen mangler tre env-variabler og et deploy**, se nedenfor |
 
 **C er bygget og verificeret** — bortset fra opbevaringsreglen. Task 1-9 og 11 af `docs/superpowers/plans/2026-09-06-c-cloud-sync.md` er i produktion. Designet ligger i `docs/superpowers/specs/2026-09-06-c-cloud-sync-design.md`; læs den før du rører fletningen.
 
-> **Politikken lover halvt af det der findes.** `/privacy` siger at inaktive konti slettes efter 12 måneder med en advarsel efter 11. **Slettedelen kører** — anvendt og verificeret mod produktionsdatabasen 2026-09-07: `pg_cron` installeret, `sweep_inactive()` oprettet, cron-jobbet `sweep-inactive` aktivt på `0 3 1 * *` (UTC), og `verify-retention.sql` 4/4. **Advarselsmailen findes ikke** — den er Task 10, Step 2, og kan ikke bygges før Resend. Så længe den mangler, holder politikken ikke helt. Der er ingen praktisk risiko endnu: basen har nul brugere, så sweepet kan tidligst nå en konto 12 måneder efter det første fremtidige login — men advarslen skal være ude før den dato.
+> **Politikken holder når afsenderen tændes, og ikke før.** `/privacy` siger at inaktive konti slettes efter 12 måneder med en advarsel efter 11.
 >
-> Funktionen i filen er **ikke** planens version. Planen koblede `auth.users` til `libraries` med et join, og en konto uden `libraries`-række — signet ind, aldrig lavet en plan — ville stå for evigt med sin emailadresse. Den skrevne version falder tilbage på kontoens egne datoer og sletter kun når `last_seen_at` **og** `last_sign_in_at` begge er gamle.
+> **Databasen er færdig** — anvendt og verificeret 2026-09-07: `pg_cron`, tabellen `retention_warnings`, viewet `retention_accounts` (én definition af "inaktiv", tre forbrugere), `sweep_inactive()`, `retention_warn_due()`, `retention_mark_warned()` og `retention_status()`. `supabase/verify-retention.sql` dækker syv konti, fire tællere og ét sweep: 7/7 og 4/4. Skemafilens fire funktionskroppe er `md5`-diffet mod `pg_proc.prosrc` og er byte-identiske med databasen.
+>
+> **Sletningen er spærret bag advarslen.** `sweep_inactive()` rører ikke en konto uden en advarsel på sig og 30 dage siden. Fejler afsenderen, bliver konsekvensen derfor at *ingenting* slettes — ikke at nogen slettes uden at have hørt fra os. Det er den rigtige retning at fejle i, men det er stadig et løfte der ikke holdes, så det er gjort tælleligt: **`retention_status().overdue_unwarned` skal være 0.** Stiger den, kører afsenderen ikke.
+>
+> **Afsenderen mangler tre env-variabler og et deploy.** `api/retention-warn.js` er skrevet og `vercel.json` har et dagligt cron-job kl. 04:00 UTC, men uden `RESEND_API_KEY`, `RESEND_FROM` og `CRON_SECRET` svarer endpointet `200` med `skipped` og et antal. Hverken endpointet eller cron-nøglen er verificeret mod produktion — der er ikke deployet. Se `TODOS.md`, *Kræver dig*, punkt 2.
+>
+> Rækkefølgen i endpointet er ikke til forhandling: **send først, registrér bagefter.** Omvendt ville en fejlet afsendelse tælle som en advarsel, og 30 dage senere ryger kontoen uden at nogen har hørt fra os.
 
 **Og magic link virker kun for organisationens egne medlemmer.** Supabases indbyggede mailserver afviser alle andre adresser med `Email address not authorized` og har et loft på 2 mails i timen. Appen viser ingen fejl — brugeren får bare aldrig noget. Custom SMTP via Resend er derfor ikke valgfrit, og det er den eneste ting der spærrer for at nogen ud over Jacob kan logge ind. Se `TODOS.md` under C.
 
@@ -163,6 +169,16 @@ Ikke med stub, men med to rigtige klienter mod den rigtige database:
 Den fjerde linje er lige så vigtig som den tredje: enhed B sendte et ældre `updatedAt`, og serveren beholdt sit indhold. Det er `updatedAt`-reglen der arbejder — feltet fandtes slet ikke i klienten indtil gennemgangen fandt det, så serveren vandt ved et tilfælde.
 
 Den femte fandt en fejl: klienten **skubbede kun**. `syncNow` kørte ved nyt login og derefter kun når noget ændrede sig lokalt, så en anden enheds ændring var usynlig indtil denne skrev noget. Ved genindlæsning er `state.session` allerede sat, så `onAuthStateChange` læser det som "var logget ind i forvejen" og springer over. `init()` synkroniserer nu også når der allerede er en session.
+
+### Opbevaringsreglen har én definition af "inaktiv", ikke tre
+
+Viewet `retention_accounts` findes for at der kun er ét sted hvor det står hvad inaktiv betyder. Tre ting læser det: sweepet, statusopgørelsen og endpointet der sender advarslen. To definitioner ville drive fra hinanden, og drift her betyder enten at maile nogen der er aktiv eller at slette nogen der aldrig blev advaret.
+
+To regler i det er værd at kende, fordi de ikke er åbenlyse:
+
+**`warned_at >= inactive_since`.** Kommer en advaret bruger tilbage, hopper `inactive_since` frem forbi advarslen, og den gamle advarsel holder op med at tælle. En ny stilhed kræver en ny advarsel. Det er også derfor `retention_warnings` aldrig ryddes ved sync: det er ikke nødvendigt, og en `delete` inde i `sync_library()` ville være endnu en skrivning på den varme sti der kunne fejle i stilhed.
+
+**`retention_warn_due()` stopper ikke ved 12 måneder.** Har afsenderen været nede, drifter konti forbi slettedatoen uadvarede, og et vindue der lukkede ved 12 måneder ville aldrig nå dem — de ville leve for evigt, og politikken ville i tavshed aldrig gælde dem. Den advarer alt der har været stille i 11 måneder eller mere uden en gyldig advarsel, og lader de 30 dage løbe derfra.
 
 ### RLS er slået til uden politikker
 
@@ -315,7 +331,8 @@ Kald der afvises før modellen (400, 422, 429) og alt mod den lokale stub-server
 | `api/sync.js` | Fletningen som rene funktioner **plus** endpointet. Fletningen eksporteres, så gaten kører den rigtige kode |
 | `scripts/validate-sync.mjs` | Gate for fletningen, 19 tilfælde, exit 0/1. Kør den før du rører fletningen |
 | `supabase/schema.sql` | Tabel, RLS, `sync_library()` og opbevaringsreglen. Anvendes i hånden — der er intet migreringsværktøj, så filen og databasen holdes i takt manuelt |
-| `supabase/verify-retention.sql` | Gate for `sweep_inactive()`, fire tilfælde i én transaktion. Rejser en fejl og ruller tilbage hvis et af dem svigter, og rydder op efter sig selv på vejen ud |
+| `supabase/verify-retention.sql` | Gate for opbevaringsreglen, syv konti og fire tællere i én transaktion. Rejser en fejl og ruller tilbage hvis et af dem svigter, og rydder op efter sig selv på vejen ud |
+| `api/retention-warn.js` | Advarselsmailen. Dagligt Vercel-cron-job. Send først, registrér bagefter. No-op uden Resend-nøglen |
 | `privacy.html` | Privatlivspolitik. Ruten `/privacy` skal ligge **før** filsystem-fasen |
 | `fonts/` | Selvhostede woff2. Google Fonts sender besøgendes IP til Google |
 | `.mcp.json` | Supabase-MCP. Godkend med `/mcp`. Brug den frem for dashboardets SQL-editor |

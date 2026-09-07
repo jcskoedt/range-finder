@@ -84,5 +84,11 @@
         "Cache-Control": "no-store"
       }
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/retention-warn",
+      "schedule": "0 4 * * *"
+    }
   ]
 }
