@@ -34,9 +34,28 @@ alter table libraries enable row level security;
 -- these policies are not what makes the feature work. They exist so that a
 -- mistake elsewhere — an anon key used directly, a future client-side query —
 -- cannot read or write another user's library.
-create policy "own row read"   on libraries for select using (auth.uid() = user_id);
-create policy "own row update" on libraries for update using (auth.uid() = user_id);
-create policy "own row insert" on libraries for insert with check (auth.uid() = user_id);
+--
+-- >>> THESE THREE ARE NOT IN THE DATABASE. <<<
+--
+-- Found 2026-09-07 by Supabase's own advisor while Task 10 was being applied,
+-- then confirmed in pg_policies: RLS is on, policy_count is 0. They were never
+-- applied, and this file said otherwise for a day — the same failure the
+-- handoff already records about the merge gate, a document describing a shape
+-- nobody has.
+--
+-- Left unapplied on purpose rather than run in a hurry. RLS with no policies
+-- denies anon and authenticated everything, which is stricter than these
+-- policies, and nothing needs them yet: no code path touches this table with
+-- anything but the service role. Apply them the day something does — the
+-- profile page is the likely first — and not before, because a policy with no
+-- consumer is access granted to nobody's benefit.
+--
+-- If a client-side query ever fails here with a permission error, this is why,
+-- and the fix is to run these three, never to turn RLS off.
+
+-- create policy "own row read"   on libraries for select using (auth.uid() = user_id);
+-- create policy "own row update" on libraries for update using (auth.uid() = user_id);
+-- create policy "own row insert" on libraries for insert with check (auth.uid() = user_id);
 
 -- Retention sweeps scan by last_seen_at.
 create index if not exists libraries_last_seen_idx on libraries (last_seen_at);
@@ -150,6 +169,15 @@ $$;
 
 revoke all on function sweep_inactive() from public, anon, authenticated;
 
+-- And from service_role, unlike sync_library. Supabase's default privileges
+-- hand service_role EXECUTE on every new function in public, so the revoke
+-- above left it holding a mass delete it has no use for — no endpoint calls
+-- this, only cron does, as postgres. The service key can already delete rows
+-- directly, so this is not a hole being closed; it is one fewer thing a leaked
+-- key can reach in a single call. Verified in pg_proc.proacl afterwards:
+-- {postgres=X/postgres}, nothing else.
+revoke all on function sweep_inactive() from service_role;
+
 -- 03:00 on the first of the month. pg_cron reads cron expressions in UTC, not
 -- Europe/Copenhagen — it drifts an hour with daylight saving and that is fine
 -- for a monthly sweep. Named schedules upsert, so re-running this file does
@@ -158,6 +186,7 @@ revoke all on function sweep_inactive() from public, anon, authenticated;
 select cron.schedule('sweep-inactive', '0 3 1 * *', 'select public.sweep_inactive()');
 
 -- Verification: supabase/verify-retention.sql, four cases, run by hand.
+-- Applied and verified against the production database 2026-09-07: 4/4.
 
 -- Make PostgREST pick the change up now rather than whenever it next notices.
 notify pgrst, 'reload schema';

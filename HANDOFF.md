@@ -27,10 +27,11 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Privatlivspolitik | live på `/privacy`, med rigtige selskabsoplysninger |
 | Slet min konto | virker, verificeret: 204 og rækken væk via cascade |
 | Skrifttyper | selvhostet, ingen Google i anmodningskæden |
+| Opbevaringsregel (12 mdr.) | sletningen kører, verificeret 4/4 — **advarselsmailen mangler**, se nedenfor |
 
 **C er bygget og verificeret** — bortset fra opbevaringsreglen. Task 1-9 og 11 af `docs/superpowers/plans/2026-09-06-c-cloud-sync.md` er i produktion. Designet ligger i `docs/superpowers/specs/2026-09-06-c-cloud-sync-design.md`; læs den før du rører fletningen.
 
-> **Politikken lover noget der ikke findes endnu.** `/privacy` siger at inaktive konti slettes efter 12 måneder med en advarsel efter 11. Slettedelen er nu **skrevet** — `supabase/schema.sql`, afsnittet *Task 10*, plus `supabase/verify-retention.sql` — men den er **ikke anvendt**: målt i basen 2026-09-07 findes `sweep_inactive` ikke og `pg_cron` er ikke installeret. Advarselsmailen er Task 10, Step 2 og kan ikke bygges før Resend. Indtil begge dele er ude, står der et løfte på en offentlig side som ikke holder. Der er ingen praktisk risiko endnu: basen har nul brugere, så det tidligste sweepet kan nå en konto er 12 måneder efter det første fremtidige login.
+> **Politikken lover halvt af det der findes.** `/privacy` siger at inaktive konti slettes efter 12 måneder med en advarsel efter 11. **Slettedelen kører** — anvendt og verificeret mod produktionsdatabasen 2026-09-07: `pg_cron` installeret, `sweep_inactive()` oprettet, cron-jobbet `sweep-inactive` aktivt på `0 3 1 * *` (UTC), og `verify-retention.sql` 4/4. **Advarselsmailen findes ikke** — den er Task 10, Step 2, og kan ikke bygges før Resend. Så længe den mangler, holder politikken ikke helt. Der er ingen praktisk risiko endnu: basen har nul brugere, så sweepet kan tidligst nå en konto 12 måneder efter det første fremtidige login — men advarslen skal være ude før den dato.
 >
 > Funktionen i filen er **ikke** planens version. Planen koblede `auth.users` til `libraries` med et join, og en konto uden `libraries`-række — signet ind, aldrig lavet en plan — ville stå for evigt med sin emailadresse. Den skrevne version falder tilbage på kontoens egne datoer og sletter kun når `last_seen_at` **og** `last_sign_in_at` begge er gamle.
 
@@ -162,6 +163,16 @@ Ikke med stub, men med to rigtige klienter mod den rigtige database:
 Den fjerde linje er lige så vigtig som den tredje: enhed B sendte et ældre `updatedAt`, og serveren beholdt sit indhold. Det er `updatedAt`-reglen der arbejder — feltet fandtes slet ikke i klienten indtil gennemgangen fandt det, så serveren vandt ved et tilfælde.
 
 Den femte fandt en fejl: klienten **skubbede kun**. `syncNow` kørte ved nyt login og derefter kun når noget ændrede sig lokalt, så en anden enheds ændring var usynlig indtil denne skrev noget. Ved genindlæsning er `state.session` allerede sat, så `onAuthStateChange` læser det som "var logget ind i forvejen" og springer over. `init()` synkroniserer nu også når der allerede er en session.
+
+### RLS er slået til uden politikker
+
+Fundet 2026-09-07 af Supabases advisor, bekræftet i `pg_policies`: `libraries` har `relrowsecurity` sat og **nul** politikker. De tre "own row"-politikker i `supabase/schema.sql` er aldrig blevet anvendt, og filen påstod det modsatte.
+
+Det er ikke et hul. RLS uden politikker nægter anon og authenticated alt, og `/api/sync` går ind med service-rollen der springer RLS over — appen er upåvirket, og databasen er strammere end filen beskrev, ikke løsere. Politikkerne står kommenteret ud i filen nu, med hvorfor og hvornår de skal køres.
+
+**Går en klient-side forespørgsel mod `libraries` en dag i stykker med en tilladelsesfejl, er det her det står.** Rettelsen er at køre de tre politikker. Den er ikke at slå RLS fra.
+
+Det er samme fejlform som gate-lektionen nedenfor: et dokument der beskriver en form ingen har. Det er nu den anden gang i dette projekt, og begge gange var det ikke koden der var forkert, men troen på at filen og virkeligheden var i takt.
 
 ### Det der kan tabe data, og hvordan det er hegnet
 

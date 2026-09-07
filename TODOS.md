@@ -9,16 +9,11 @@ B1 (AI-plangenerering) og B2 (replan) er færdige og i produktion. Se `HANDOFF.m
 
 Fire ting spærrer for resten, og ingen af dem er kode. De står i den rækkefølge de bør tages: nummer 1 er et ja, nummer 2 har DNS-ventetid indbygget, og 3 og 4 hænger på nummer 2.
 
-### 1. Godkend databaseændringen — opbevaringsreglen
+### ~~1. Godkend databaseændringen~~ — kørt 2026-09-07
 
-SQL'en er skrevet og ligger i `supabase/schema.sql` (afsnittet *Task 10*). Databasen har den ikke endnu: `pg_cron` er ikke installeret og `sweep_inactive` findes ikke — målt i basen 2026-09-07, ikke læst i skemafilen.
+`pg_cron` installeret, `sweep_inactive()` oprettet, cron-jobbet `sweep-inactive` aktivt på `0 3 1 * *` i UTC, og `verify-retention.sql` bestod 4/4. Funktionen kan kun kaldes af `postgres`. Basen står som den blev fundet: 0 brugere, 0 forældreløse biblioteker.
 
-Sig til, så kører jeg de to ting gennem Supabase-MCP'en og verifikationen bagefter. Du får én godkendelse at trykke ja til. Vil du selv gøre det, er det disse to, i den rækkefølge, **gennem MCP og ikke gennem dashboardets SQL-editor** — editoren ødelægger dollar-citerede funktionskroppe, og det har kostet tid før:
-
-1. `supabase/schema.sql`, afsnittet *Task 10* — `create extension pg_cron`, funktionen, `revoke`, og `cron.schedule`.
-2. `supabase/verify-retention.sql` — fire tilfælde, rejser en fejl hvis et af dem svigter, og rydder op efter sig selv.
-
-Det er en ren tilføjelse. Den rører hverken tabellen, RLS eller `sync_library()`.
+Tilbage af opbevaringsreglen er advarselsmailen — se den sidste note i dette afsnit.
 
 ### 2. Resend-konto og verificeret afsenderdomæne
 
@@ -40,7 +35,13 @@ Basen er tom lige nu — slette-konto-testen 6/9 tog den ene konto med sig — s
 
 CEO-planens Gate 0. Stadig ikke gjort, og det er det eneste der kan besvare om AI-planer er bedre end algoritme-planer. Kan først gøres når nummer 2 er på plads — indtil da kan de ikke logge ind, og appen viser dem ikke nogen fejl.
 
-### Og én ting mere du skal vide
+### Og to ting mere du skal vide
+
+**`libraries` har RLS slået til og nul politikker.** De tre "own row"-politikker i `supabase/schema.sql` blev aldrig anvendt; fundet 2026-09-07 af Supabases egen advisor og bekræftet i `pg_policies`. Det er ikke et hul: RLS uden politikker nægter anon og authenticated alt, og `/api/sync` bruger service-rollen der springer RLS over, så appen er upåvirket. Filen er nu rettet til at sige det — politikkerne står kommenteret ud med hvorfor.
+
+Beslutningen er din: lad dem være til noget faktisk har brug for dem (profilsiden er den første kandidat), eller kør dem nu for at have dem. Jeg anbefaler det første — en politik uden forbruger giver adgang til ingens fordel, og fail-closed er strammere. Men det skal være et valg, ikke en glemsel.
+
+
 
 `/privacy` lover en advarsel efter 11 måneder. Slettedelen er der efter nummer 1; **advarselsmailen findes ikke**, og den kan ikke bygges før Resend. Der er ingen risiko lige nu — sweepet kan først nå en konto 12 måneder efter sidste login, og der er nul konti — men advarslen skal være ude før den første konto bliver så gammel. Det er Task 10, Step 2, og den bygger jeg når nummer 2 er på plads.
 
@@ -94,7 +95,7 @@ C bringer også ting ind som ikke er tekniske. I dag gemmer appen nul persondata
 - [x] ~~Magic link auth (email, ingen adgangskode)~~ `fef2401`. Verificeret ende til ende 2026-09-06: link sendt, modtaget, klikket, session hydreret.
 - [x] ~~Cloud sync: planer og sessioner i skyen~~ `5fb6931`. Ikke *i stedet for* localStorage — localStorage forblev det primære lager, og skyen er et spejl. Det var beslutning 3.
 - [x] ~~`/api/migrate-plan`~~ **udgår.** Første login er bare den første synkronisering mod et tomt dokument, og fletningen klarer resten. Det fjerner også hele uuid-problemet CEO-planen brugte et afsnit på: `plan.id` forlader aldrig dokumentet.
-- [ ] **Opbevaringsreglen (Task 10).** SQL'en er skrevet i `supabase/schema.sql`; databasen mangler den stadig, og advarselsmailen mangler Resend. Se *Kræver dig* øverst, punkt 1 og den sidste note.
+- [ ] **Opbevaringsreglen (Task 10).** Sletningen kører — anvendt og verificeret 2026-09-07, 4/4. **Advarselsmailen (Step 2) mangler og kræver Resend**, så politikkens løfte holder kun halvt indtil da.
 
   Planens egen version af `sweep_inactive()` er **ikke** den der blev skrevet. Den koblede `auth.users` til `libraries` med et join, og en bruger der logger ind uden nogensinde at lave en plan har ingen `libraries`-række — de konti ville stå for evigt med en emailadresse i, altså præcis det politikken lover at fjerne. Den skrevne version falder tilbage på kontoens egne datoer og kræver at **både** `last_seen_at` og `last_sign_in_at` er gamle, før den sletter.
 

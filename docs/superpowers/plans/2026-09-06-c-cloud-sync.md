@@ -987,12 +987,22 @@ git commit -m "feat(gdpr): delete your account, and say what is stored"
 
 ---
 
-## Task 10: Opbevaring — advarsel og sletning
+## ◐ Task 10: Opbevaring — advarsel og sletning
+
+> **Step 1, 3 og 4 er kørt 2026-09-07. Step 2 mangler og kræver Resend.**
+>
+> Den anvendte SQL er **ikke** den der står nedenfor. Joinet mod `libraries`
+> ville lade en konto uden bibliotek — signet ind, aldrig lavet en plan — stå
+> for evigt med sin emailadresse, og det er det politikken lover at fjerne.
+> Den kørte version falder tilbage på kontoens egne datoer og kræver at både
+> `last_seen_at` og `last_sign_in_at` er gamle. Sandheden står i
+> `supabase/schema.sql`, afsnittet *Task 10*; verifikationen i
+> `supabase/verify-retention.sql`, fire tilfælde i stedet for Step 3's ene.
 
 **Files:**
 - Modify: `supabase/schema.sql`
 
-- [ ] **Step 1: Advarsels- og slettefunktion**
+- [x] **Step 1: Advarsels- og slettefunktion** — kørt, men omskrevet. Se noten øverst.
 
 ```sql
 -- 11 months of silence gets a warning, 12 gets deleted. auth.users cascade
@@ -1014,7 +1024,7 @@ select cron.schedule('sweep-inactive', '0 3 1 * *', 'select sweep_inactive()');
 
 En Supabase Edge Function der kører dagen før og sender via Resend til brugere med `last_seen_at` mellem 11 og 12 måneder. Kræver Resend-nøglen som secret.
 
-- [ ] **Step 3: Verificér uden at vente et år**
+- [x] **Step 3: Verificér uden at vente et år** — erstattet af `supabase/verify-retention.sql`, 4/4.
 
 ```sql
 update libraries set last_seen_at = now() - interval '13 months' where user_id = '<testbruger>';
@@ -1024,7 +1034,7 @@ select count(*) from libraries where user_id = '<testbruger>';
 
 Forventet: `0`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** — `ab89f49`.
 
 ```bash
 git add supabase/schema.sql
