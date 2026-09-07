@@ -1,5 +1,5 @@
 # Range Finder — Handoff
-Sidst opdateret: 2026-09-06
+Sidst opdateret: 2026-09-07
 
 ## Hvad det er
 
@@ -30,7 +30,9 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 
 **C er bygget og verificeret** — bortset fra opbevaringsreglen. Task 1-9 og 11 af `docs/superpowers/plans/2026-09-06-c-cloud-sync.md` er i produktion. Designet ligger i `docs/superpowers/specs/2026-09-06-c-cloud-sync-design.md`; læs den før du rører fletningen.
 
-> **Politikken lover noget der ikke findes endnu.** `/privacy` siger at inaktive konti slettes efter 12 måneder med en advarsel efter 11. Verificeret i databasen 2026-09-06: `sweep_inactive` findes ikke, og `pg_cron` er ikke installeret. Det er Task 10, og indtil den er kørt, står der et løfte på en offentlig side som ikke holder.
+> **Politikken lover noget der ikke findes endnu.** `/privacy` siger at inaktive konti slettes efter 12 måneder med en advarsel efter 11. Slettedelen er nu **skrevet** — `supabase/schema.sql`, afsnittet *Task 10*, plus `supabase/verify-retention.sql` — men den er **ikke anvendt**: målt i basen 2026-09-07 findes `sweep_inactive` ikke og `pg_cron` er ikke installeret. Advarselsmailen er Task 10, Step 2 og kan ikke bygges før Resend. Indtil begge dele er ude, står der et løfte på en offentlig side som ikke holder. Der er ingen praktisk risiko endnu: basen har nul brugere, så det tidligste sweepet kan nå en konto er 12 måneder efter det første fremtidige login.
+>
+> Funktionen i filen er **ikke** planens version. Planen koblede `auth.users` til `libraries` med et join, og en konto uden `libraries`-række — signet ind, aldrig lavet en plan — ville stå for evigt med sin emailadresse. Den skrevne version falder tilbage på kontoens egne datoer og sletter kun når `last_seen_at` **og** `last_sign_in_at` begge er gamle.
 
 **Og magic link virker kun for organisationens egne medlemmer.** Supabases indbyggede mailserver afviser alle andre adresser med `Email address not authorized` og har et loft på 2 mails i timen. Appen viser ingen fejl — brugeren får bare aldrig noget. Custom SMTP via Resend er derfor ikke valgfrit, og det er den eneste ting der spærrer for at nogen ud over Jacob kan logge ind. Se `TODOS.md` under C.
 
@@ -301,7 +303,8 @@ Kald der afvises før modellen (400, 422, 429) og alt mod den lokale stub-server
 | `scripts/sweep-plan-length.mjs` | Finder hvor lange planer knækker |
 | `api/sync.js` | Fletningen som rene funktioner **plus** endpointet. Fletningen eksporteres, så gaten kører den rigtige kode |
 | `scripts/validate-sync.mjs` | Gate for fletningen, 19 tilfælde, exit 0/1. Kør den før du rører fletningen |
-| `supabase/schema.sql` | Tabel, RLS og `sync_library()`. Anvendes i hånden — der er intet migreringsværktøj, så filen og databasen holdes i takt manuelt |
+| `supabase/schema.sql` | Tabel, RLS, `sync_library()` og opbevaringsreglen. Anvendes i hånden — der er intet migreringsværktøj, så filen og databasen holdes i takt manuelt |
+| `supabase/verify-retention.sql` | Gate for `sweep_inactive()`, fire tilfælde i én transaktion. Rejser en fejl og ruller tilbage hvis et af dem svigter, og rydder op efter sig selv på vejen ud |
 | `privacy.html` | Privatlivspolitik. Ruten `/privacy` skal ligge **før** filsystem-fasen |
 | `fonts/` | Selvhostede woff2. Google Fonts sender besøgendes IP til Google |
 | `.mcp.json` | Supabase-MCP. Godkend med `/mcp`. Brug den frem for dashboardets SQL-editor |

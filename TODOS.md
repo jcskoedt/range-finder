@@ -1,7 +1,48 @@
 # Range Finder — TODO
-Sidst opdateret: 2026-09-06
+Sidst opdateret: 2026-09-07
 
 B1 (AI-plangenerering) og B2 (replan) er færdige og i produktion. Se `HANDOFF.md` for hvordan projektet hænger sammen.
+
+---
+
+## Kræver dig — trin for trin
+
+Fire ting spærrer for resten, og ingen af dem er kode. De står i den rækkefølge de bør tages: nummer 1 er et ja, nummer 2 har DNS-ventetid indbygget, og 3 og 4 hænger på nummer 2.
+
+### 1. Godkend databaseændringen — opbevaringsreglen
+
+SQL'en er skrevet og ligger i `supabase/schema.sql` (afsnittet *Task 10*). Databasen har den ikke endnu: `pg_cron` er ikke installeret og `sweep_inactive` findes ikke — målt i basen 2026-09-07, ikke læst i skemafilen.
+
+Sig til, så kører jeg de to ting gennem Supabase-MCP'en og verifikationen bagefter. Du får én godkendelse at trykke ja til. Vil du selv gøre det, er det disse to, i den rækkefølge, **gennem MCP og ikke gennem dashboardets SQL-editor** — editoren ødelægger dollar-citerede funktionskroppe, og det har kostet tid før:
+
+1. `supabase/schema.sql`, afsnittet *Task 10* — `create extension pg_cron`, funktionen, `revoke`, og `cron.schedule`.
+2. `supabase/verify-retention.sql` — fire tilfælde, rejser en fejl hvis et af dem svigter, og rydder op efter sig selv.
+
+Det er en ren tilføjelse. Den rører hverken tabellen, RLS eller `sync_library()`.
+
+### 2. Resend-konto og verificeret afsenderdomæne
+
+Den vigtigste, fordi DNS tager tid og fordi to andre punkter venter på den. Se det udførlige punkt under *C* nedenfor for hvorfor.
+
+1. Opret konto på resend.com og tilføj domænet.
+2. Læg de DNS-records Resend viser (SPF og DKIM) hos den udbyder der har domænet. Vent på at de er verificeret — minutter til timer.
+3. Supabase-dashboardet → dit projekt → Authentication → Emails → SMTP-indstillingerne → slå custom SMTP til med Resends værdier.
+4. Samme sted, Rate Limits: loftet starter på 30 mails i timen efter custom SMTP. Skru op hvis det bliver for lidt.
+5. Test på en adresse der **ikke** er din egen og ikke er medlem af Supabase-organisationen. Det er hele pointen — på din egen virker det også uden Resend.
+
+### 3. Accepter Supabases databehandleraftale
+
+`supabase.com/legal/dpa`, eller dashboardet → organisationen → Settings → de juridiske dokumenter. Den skal **accepteres**, ikke bare læses: i det øjeblik der ligger en emailadresse i basen, er du dataansvarlig og Supabase din databehandler.
+
+Basen er tom lige nu — slette-konto-testen 6/9 tog den ene konto med sig — så det er ikke akut i dag. Det skal være på plads før nummer 2 er færdig, for derefter kommer der brugere.
+
+### 4. Del linket med fem rigtige folk
+
+CEO-planens Gate 0. Stadig ikke gjort, og det er det eneste der kan besvare om AI-planer er bedre end algoritme-planer. Kan først gøres når nummer 2 er på plads — indtil da kan de ikke logge ind, og appen viser dem ikke nogen fejl.
+
+### Og én ting mere du skal vide
+
+`/privacy` lover en advarsel efter 11 måneder. Slettedelen er der efter nummer 1; **advarselsmailen findes ikke**, og den kan ikke bygges før Resend. Der er ingen risiko lige nu — sweepet kan først nå en konto 12 måneder efter sidste login, og der er nul konti — men advarslen skal være ude før den første konto bliver så gammel. Det er Task 10, Step 2, og den bygger jeg når nummer 2 er på plads.
 
 ---
 
@@ -19,7 +60,7 @@ Målingen kører i produktion. Tilbage er at få rigtige folk igennem den:
   ```
   Giver den `text/html`, sluger en rute stien igen — så er catch-all'en eller `handle: filesystem` blevet rørt.
 - [x] ~~**`@vercel/analytics` fjernet igen.**~~ Lå ucommittet efter et `npm i` uden at nogen kode importerede den. Appen bruger `window.va`-shimmen og et `<script src>`-tag i `index.html`.
-- [ ] **Del linket med fem rigtige folk.** Det er CEO-planens Gate 0, det er stadig ikke gjort, og det er nu den eneste blokering for at kunne afgøre C.
+- [ ] **Del linket med fem rigtige folk.** CEO-planens Gate 0, stadig ikke gjort. C er bygget nu, så det blokerer ikke længere *arbejdet* — det blokerer svaret på om AI-planerne er værd at have. Kræver Resend først. Se *Kræver dig* øverst, punkt 4.
 - [ ] `replan_used` er det eneste event der ikke er testet — det kræver API'et og sprungne uger.
 
 ---
@@ -36,7 +77,7 @@ C bringer også ting ind som ikke er tekniske. I dag gemmer appen nul persondata
 
 ### Start med denne — den har ventetid indbygget
 
-- [ ] **Resend-konto og verificeret afsenderdomæne.** Ikke en detalje til sidst: det er en forudsætning for at magic link virker for andre end dig selv.
+- [ ] **Resend-konto og verificeret afsenderdomæne.** Trinene står i *Kræver dig* øverst, punkt 2. Ikke en detalje til sidst: det er en forudsætning for at magic link virker for andre end dig selv.
 
   Supabases indbyggede mailserver **sender kun til medlemmer af din egen Supabase-organisation**. Alle andre adresser fejler med `Email address not authorized`, og loftet er 2 mails i timen. Magic link vil altså virke perfekt når du tester på dig selv, og fejle for hver eneste testbruger. Kilde: supabase.com/docs/guides/auth/auth-smtp.
 
@@ -48,11 +89,15 @@ C bringer også ting ind som ikke er tekniske. I dag gemmer appen nul persondata
 
 - [x] ~~**Supabase-projekt: auth + Postgres.**~~ Oprettet via Vercels Marketplace-integration, ref `pxbrkdymegmizyvaqude`. Skemaet er kørt: tabellen `libraries`, RLS-politikkerne, indekset og `sync_library()`. Kilden ligger i `supabase/schema.sql` — der er intet migreringsværktøj, så de to skal holdes i takt manuelt.
 - [x] ~~**Bekraeft regionen er EU.**~~ eu-west-1, Irland. Laest fra projektet via Supabase-MCP, ikke gaettet ud fra en IP-blok. Staar i privatlivspolitikken.
-- [ ] **Accepter Supabases databehandleraftale**, `supabase.com/legal/dpa`. Den skal accepteres, ikke bare læses. Aktuel nu — der findes en brugerkonto i basen.
+- [ ] **Accepter Supabases databehandleraftale.** Se *Kræver dig* øverst, punkt 3. (Basen er tom igen — 0 brugere, målt 2026-09-07 — så det er ikke akut i dag, men det skal være på plads før der er brugere.)
 - [x] ~~**Privatlivspolitik og en slette-mig-funktion.**~~ Politikken ligger paa /privacy med rigtige selskabsoplysninger, og slet-konto-knappen er verificeret mod produktionsdatabasen: 204, og baade bruger og bibliotek vaek via cascade.
 - [x] ~~Magic link auth (email, ingen adgangskode)~~ `fef2401`. Verificeret ende til ende 2026-09-06: link sendt, modtaget, klikket, session hydreret.
 - [x] ~~Cloud sync: planer og sessioner i skyen~~ `5fb6931`. Ikke *i stedet for* localStorage — localStorage forblev det primære lager, og skyen er et spejl. Det var beslutning 3.
 - [x] ~~`/api/migrate-plan`~~ **udgår.** Første login er bare den første synkronisering mod et tomt dokument, og fletningen klarer resten. Det fjerner også hele uuid-problemet CEO-planen brugte et afsnit på: `plan.id` forlader aldrig dokumentet.
+- [ ] **Opbevaringsreglen (Task 10).** SQL'en er skrevet i `supabase/schema.sql`; databasen mangler den stadig, og advarselsmailen mangler Resend. Se *Kræver dig* øverst, punkt 1 og den sidste note.
+
+  Planens egen version af `sweep_inactive()` er **ikke** den der blev skrevet. Den koblede `auth.users` til `libraries` med et join, og en bruger der logger ind uden nogensinde at lave en plan har ingen `libraries`-række — de konti ville stå for evigt med en emailadresse i, altså præcis det politikken lover at fjerne. Den skrevne version falder tilbage på kontoens egne datoer og kræver at **både** `last_seen_at` og `last_sign_in_at` er gamle, før den sletter.
+
 - [ ] **Email-felt i wizarden** — flyttet hertil fra B1. Teksten lover "gemmes når du logger ind", og der er intet login før C. En email i localStorage gør heller ikke migreringen lettere, for sign-in-flowet spørger alligevel. Bygges sammen med magic link auth.
 
 ---

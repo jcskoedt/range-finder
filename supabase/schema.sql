@@ -7,9 +7,8 @@
 -- Applied by hand in the Supabase SQL editor. This file is the record of what
 -- was applied — keep them in step, there is no migration tooling here.
 --
--- Two things arrive in later tasks and are deliberately not in this file yet:
---   Task 5  sync_library()  — read, merge and write in one locked transaction
---   Task 10 sweep_inactive() + pg_cron — the 12-month retention rule
+-- Order in this file follows the plan: the table, sync_library() (Task 5), and
+-- the retention rule (Task 10) last.
 --
 -- Why one table and no relations: nothing is ever queried across plans or
 -- across users. A relational schema would buy nothing and cost a migration
@@ -101,6 +100,64 @@ revoke all on function sync_library(uuid, jsonb, bigint) from public, anon, auth
 -- "not found in schema cache" rather than as a permission error, which reads
 -- like the function is missing from a database where it plainly exists.
 grant execute on function sync_library(uuid, jsonb, bigint) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Task 10: the retention rule.
+--
+-- /privacy promises that an inactive account is warned after 11 months and
+-- deleted after 12. Only the deletion half is here. The warning is an Edge
+-- Function that needs Resend, so until that exists the page promises a mail
+-- nobody sends. Nothing is at risk yet — the sweep cannot reach an account
+-- until 12 months after its last sign-in and the database has no users — but
+-- the warning has to exist before the first account gets that old.
+
+create extension if not exists pg_cron;
+
+-- Two deliberate departures from the plan's version of this function.
+--
+-- The plan wrote `delete from auth.users u using libraries l where
+-- l.user_id = u.id and l.last_seen_at < ...`. A user who signs in and never
+-- makes a plan has no libraries row, so that join never matches them and the
+-- account stands forever holding an email address — the one thing the policy
+-- promises to get rid of. coalesce() falls back to the account's own dates.
+--
+-- And greatest() over both signals, not last_seen_at alone: last_seen_at is
+-- touched on every sync and is the sharper signal, but if the sync loop ever
+-- stops touching it, an active account would look silent. An account survives
+-- if either signal is recent. Deleting someone's data by accident is the
+-- failure that cannot be undone, so the rule leans that way on purpose.
+--
+-- No security definer, unlike sync_library. pg_cron runs the job as postgres,
+-- which already has the rights, and a security-definer mass-delete reachable
+-- over PostgREST is exactly the door the sync_library revoke exists to shut.
+-- The revoke below is the second lock: without it PUBLIC keeps the EXECUTE
+-- that Postgres grants by default.
+
+create or replace function sweep_inactive()
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  delete from auth.users u
+   where greatest(
+           coalesce((select l.last_seen_at from public.libraries l
+                      where l.user_id = u.id), u.created_at),
+           coalesce(u.last_sign_in_at, u.created_at)
+         ) < now() - interval '12 months';
+end;
+$$;
+
+revoke all on function sweep_inactive() from public, anon, authenticated;
+
+-- 03:00 on the first of the month. pg_cron reads cron expressions in UTC, not
+-- Europe/Copenhagen — it drifts an hour with daylight saving and that is fine
+-- for a monthly sweep. Named schedules upsert, so re-running this file does
+-- not stack duplicate jobs. Whether a run happened, and whether it failed,
+-- is in cron.job_run_details.
+select cron.schedule('sweep-inactive', '0 3 1 * *', 'select public.sweep_inactive()');
+
+-- Verification: supabase/verify-retention.sql, four cases, run by hand.
 
 -- Make PostgREST pick the change up now rather than whenever it next notices.
 notify pgrst, 'reload schema';
