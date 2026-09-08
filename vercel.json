@@ -1,94 +1,29 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "logo.png",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "icon.svg",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "landing-hero-mockup.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "hero-video.mp4",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "hero-fallback.jpg",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "privacy.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "fonts/**",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "api/*.js",
-      "use": "@vercel/node"
-    }
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "logo.png", "use": "@vercel/static" },
+    { "src": "icon.svg", "use": "@vercel/static" },
+    { "src": "hero-video.mp4", "use": "@vercel/static" },
+    { "src": "hero-fallback.jpg", "use": "@vercel/static" },
+    { "src": "privacy.html", "use": "@vercel/static" },
+    { "src": "fonts/**", "use": "@vercel/static" },
+    { "src": "api/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1.js"
-    },
+    { "src": "/api/(.*)", "dest": "/api/$1.js" },
     {
       "src": "/(index\\.html)?",
-      "headers": {
-        "Cache-Control": "no-store"
-      },
+      "headers": { "Cache-Control": "no-store" },
       "continue": true
     },
-    {
-      "src": "/privacy",
-      "dest": "/privacy.html"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/logo.png",
-      "dest": "/logo.png"
-    },
-    {
-      "src": "/icon.svg",
-      "dest": "/icon.svg"
-    },
-    {
-      "src": "/landing-hero-mockup.html",
-      "dest": "/landing-hero-mockup.html"
-    },
-    {
-      "src": "/hero-video.mp4",
-      "dest": "/hero-video.mp4"
-    },
-    {
-      "src": "/hero-fallback.jpg",
-      "dest": "/hero-fallback.jpg"
-    },
+    { "src": "/privacy", "dest": "/privacy.html" },
+    { "handle": "filesystem" },
     {
       "src": "/(?!_vercel/)(.*)",
       "dest": "/index.html",
-      "headers": {
-        "Cache-Control": "no-store"
-      }
+      "headers": { "Cache-Control": "no-store" }
     }
   ],
-  "crons": [
-    {
-      "path": "/api/retention-warn",
-      "schedule": "0 4 * * *"
-    }
-  ]
+  "crons": [{ "path": "/api/retention-warn", "schedule": "0 4 * * *" }]
 }
