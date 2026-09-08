@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Range Finder — profilside, preview</title>
+<style>
+/* Fonts: relative paths, not /fonts/, so the file works opened straight from
+   disk with file:// — the app uses absolute paths because it is served. */
+@font-face{font-family:"Inter";font-style:normal;font-weight:200 700;font-display:swap;
+  src:url(fonts/inter-200-700-latin.woff2) format("woff2");}
+@font-face{font-family:"Turret Road";font-style:normal;font-weight:700;font-display:swap;
+  src:url(fonts/turret-road-700-latin.woff2) format("woff2");}
+@font-face{font-family:"Turret Road";font-style:normal;font-weight:400;font-display:swap;
+  src:url(fonts/turret-road-400-latin.woff2) format("woff2");}
+
+:root{
+  --bg:#FFFFFF;
+  --yellow:#F5E642;
+  --red:#CC2020;
+  --text:#0A0A0A;
+  --subtle:#767676;
+  --border:#0A0A0A;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+h1,h2,h3{font:inherit;}
+html,body{background:var(--bg);color:var(--text);}
+body{font-family:'Inter',sans-serif;line-height:1.5;max-width:640px;margin:0 auto;padding-bottom:120px;}
+.display{font-family:'Turret Road',sans-serif;font-weight:700;line-height:1.0;letter-spacing:-0.01em;}
+
+/* ---- preview chrome. NOT part of the app. ---- */
+.pv-bar{position:sticky;top:0;z-index:80;background:#111;color:#fff;padding:10px 12px;
+  display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.pv-bar b{font-family:'Turret Road',sans-serif;font-size:11px;letter-spacing:0.1em;
+  text-transform:uppercase;margin-right:6px;color:var(--yellow);}
+.pv-bar button{font-family:'Inter',sans-serif;font-size:12px;padding:6px 10px;cursor:pointer;
+  background:#222;color:#eee;border:1px solid #555;}
+.pv-bar button.on{background:var(--yellow);color:#111;border-color:var(--yellow);font-weight:600;}
+.pv-note{font-size:11.5px;color:#aaa;padding:0 12px 10px;background:#111;margin:0;}
+.pv-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);
+  padding:14px 24px 0;font-weight:600;}
+.pv-new{background:var(--yellow);padding:1px 5px;font-size:9.5px;font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;margin-left:6px;vertical-align:2px;}
+
+/* ---- buttons, copied from index.html ---- */
+.btn{display:inline-block;background:var(--text);color:var(--yellow);border:2px solid var(--text);
+  font-family:'Turret Road',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.06em;
+  text-transform:uppercase;padding:12px 20px;min-height:44px;border-radius:0;cursor:pointer;}
+.btn:hover{background:var(--yellow);border-color:var(--text);color:var(--text);}
+.btn-outline{background:transparent;border:2px solid var(--text);color:var(--text);
+  font-family:'Turret Road',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.06em;
+  text-transform:uppercase;padding:12px 20px;min-height:44px;cursor:pointer;border-radius:0;}
+.btn-outline:hover{background:var(--yellow);}
+.btn-danger{background:none;border:2px solid #ccc;color:var(--subtle);font-size:11px;font-weight:700;
+  letter-spacing:0.08em;text-transform:uppercase;padding:9px 16px;cursor:pointer;}
+.btn-danger:hover{border-color:var(--red);color:var(--red);}
+.btn-small{font-family:'Turret Road',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.06em;
+  text-transform:uppercase;padding:8px 12px;background:transparent;border:2px solid var(--text);
+  color:var(--text);cursor:pointer;}
+.btn-small:hover{background:var(--yellow);}
+
+/* ---- the new wordmark row: the hero carried this and the hero is gone ---- */
+.profile-top{display:flex;align-items:center;gap:8px;padding:20px 24px 0;}
+.profile-top-icon{width:22px;height:22px;border:2px solid var(--border);display:flex;
+  align-items:center;justify-content:center;flex-shrink:0;}
+.profile-top-icon svg{width:14px;height:14px;fill:none;stroke:var(--text);stroke-width:2;}
+.profile-top-text{font-family:'Turret Road',sans-serif;font-weight:700;font-size:15px;
+  letter-spacing:0.02em;}
+
+/* ---- plans, copied from index.html ---- */
+.plans-section{padding:0 24px;}
+.plans-header{display:flex;justify-content:space-between;align-items:baseline;
+  padding:28px 0 16px;border-bottom:2px solid var(--border);}
+.plans-header h2{font-family:'Turret Road',sans-serif;font-weight:700;font-size:22px;}
+.plan-card{display:flex;align-items:stretch;border-bottom:2px solid var(--border);
+  cursor:pointer;transition:background 0.1s;min-height:100px;}
+.plan-card:hover{background:var(--yellow);}
+.plan-card-num{width:56px;flex-shrink:0;border-right:2px solid var(--border);display:flex;
+  align-items:flex-start;padding:16px 12px;font-family:'Turret Road',sans-serif;font-size:11px;
+  font-weight:700;letter-spacing:0.06em;color:var(--subtle);}
+.plan-card-body{flex:1;padding:16px 16px;}
+.plan-card-sport{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);
+  font-weight:600;margin-bottom:4px;}
+.plan-card-title{font-family:'Turret Road',sans-serif;font-size:20px;font-weight:700;line-height:1.1;}
+.plan-card-meta{font-size:12px;color:var(--subtle);margin-top:6px;}
+.plan-card-arrow{width:48px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-size:20px;border-left:2px solid var(--border);}
+
+/* ---- the account foot ---- */
+.acct{margin:36px 24px 0;border-top:2px solid var(--border);padding-top:14px;}
+.acct-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--subtle);}
+.acct-dot{color:#1a7f37;font-weight:700;}
+.acct-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}
+.acct details{margin-top:14px;}
+.acct summary{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--subtle);
+  cursor:pointer;font-weight:600;}
+.acct-fold{padding-top:12px;display:flex;flex-direction:column;gap:8px;}
+.acct-fold p{font-size:11.5px;color:var(--subtle);line-height:1.5;max-width:46ch;}
+
+/* ---- auth box, copied from index.html ---- */
+.auth-box{margin:24px 24px 0;padding:18px 16px;border:2px solid var(--border);
+  display:flex;flex-direction:column;gap:10px;position:relative;}
+.auth-title{font-family:"Turret Road",sans-serif;font-weight:700;font-size:15px;}
+.auth-body{font-size:13px;color:var(--subtle);line-height:1.5;max-width:46ch;}
+.auth-row{display:flex;gap:8px;flex-wrap:wrap;}
+.auth-row input{font-family:'Inter',sans-serif;font-size:14px;padding:11px 12px;
+  border:2px solid var(--border);min-height:44px;flex:1;min-width:180px;border-radius:0;}
+.auth-consent{font-size:11.5px;color:var(--subtle);line-height:1.5;max-width:46ch;}
+.auth-consent a{color:var(--text);}
+.auth-or{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--subtle);
+  text-align:center;font-weight:600;}
+
+/* ---- calendar tab mock ---- */
+.tabs{display:flex;border-bottom:2px solid var(--border);margin:0 24px;}
+.plan-tab{flex:1;font-family:'Turret Road',sans-serif;font-size:12px;font-weight:700;
+  letter-spacing:0.06em;text-transform:uppercase;padding:14px 4px;background:none;border:none;
+  border-bottom:3px solid transparent;cursor:pointer;color:var(--subtle);}
+.plan-tab.active{color:var(--text);border-bottom-color:var(--text);}
+.sess{margin:20px 24px 0;border:2px solid var(--border);}
+.sess-head{padding:14px 16px;border-bottom:2px solid var(--border);}
+.sess-when{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--subtle);
+  font-weight:600;}
+.sess-title{font-family:'Turret Road',sans-serif;font-size:22px;font-weight:700;margin-top:4px;}
+.sess-desc{padding:14px 16px;font-size:13px;line-height:1.6;white-space:pre-line;}
+.sess-desc .k{color:var(--subtle);}
+.sess-foot{padding:12px 16px;border-top:2px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;}
+
+.lang-toggle{position:fixed;bottom:16px;right:16px;z-index:50;display:flex;
+  border:2px solid var(--border);background:var(--bg);box-shadow:0 2px 10px rgba(0,0,0,0.18);}
+.lang-toggle button{font-family:'Turret Road',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:0.06em;padding:8px 11px;background:none;border:none;cursor:pointer;color:var(--subtle);}
+.lang-toggle button.on{background:var(--text);color:var(--yellow);}
+</style>
+</head>
+<body>
+
+<div class="pv-bar">
+  <b>Preview</b>
+  <button data-v="in" class="on">Profil, logget ind</button>
+  <button data-v="out">Profil, ikke logget ind</button>
+  <button data-v="cal">Kalender-fanen</button>
+</div>
+<p class="pv-note">
+  Statisk mockup. Ingen af knapperne gør noget, og filen er ikke koblet til appen —
+  den findes for at du kan se layoutet og sige ja eller nej. Gul markering = nyt.
+</p>
+
+<!-- ============ PROFIL, LOGGET IND ============ -->
+<section id="v-in">
+  <div class="profile-top">
+    <div class="profile-top-icon">
+      <svg viewBox="0 0 16 16"><polyline points="2,11 5,7 8,9 11,5 14,7"/></svg>
+    </div>
+    <span class="profile-top-text">Range Finder</span>
+    <span class="pv-new">ny linje</span>
+  </div>
+
+  <div class="plans-section">
+    <div class="plans-header">
+      <h2>Mine planer</h2>
+      <button class="btn-outline">Ny plan</button>
+    </div>
+
+    <div class="plan-card">
+      <div class="plan-card-num">#02</div>
+      <div class="plan-card-body">
+        <div class="plan-card-sport">Løb</div>
+        <div class="plan-card-title">42 km løb</div>
+        <div class="plan-card-meta">24 uger · 4 pr. uge · 2026-09-04</div>
+      </div>
+      <div class="plan-card-arrow">→</div>
+    </div>
+
+    <div class="plan-card">
+      <div class="plan-card-num">#01</div>
+      <div class="plan-card-body">
+        <div class="plan-card-sport">Cykling</div>
+        <div class="plan-card-title">90 km cykling</div>
+        <div class="plan-card-meta">12 uger · 3 pr. uge · 2026-08-20</div>
+      </div>
+      <div class="plan-card-arrow">→</div>
+    </div>
+  </div>
+
+  <div class="acct">
+    <div class="acct-line">
+      <span>jacob@houseofvinterberg.com</span>
+      <span class="acct-dot">✓</span>
+      <span>synkroniseret</span>
+    </div>
+    <div class="acct-actions">
+      <button class="btn-danger">Log ud</button>
+    </div>
+    <details>
+      <summary>Konto</summary>
+      <div class="acct-fold">
+        <p>Sletter din konto og alle planer i skyen, med det samme og uden bekræftelse
+          bagefter. Planerne i denne browser bliver liggende.</p>
+        <div><button class="btn-danger">Slet min konto</button></div>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ============ PROFIL, IKKE LOGGET IND ============ -->
+<section id="v-out" hidden>
+  <div class="profile-top">
+    <div class="profile-top-icon">
+      <svg viewBox="0 0 16 16"><polyline points="2,11 5,7 8,9 11,5 14,7"/></svg>
+    </div>
+    <span class="profile-top-text">Range Finder</span>
+  </div>
+
+  <div class="plans-section">
+    <div class="plans-header">
+      <h2>Mine planer</h2>
+      <button class="btn-outline">Ny plan</button>
+    </div>
+    <div class="plan-card">
+      <div class="plan-card-num">#01</div>
+      <div class="plan-card-body">
+        <div class="plan-card-sport">Løb</div>
+        <div class="plan-card-title">42 km løb</div>
+        <div class="plan-card-meta">24 uger · 4 pr. uge · 2026-09-04</div>
+      </div>
+      <div class="plan-card-arrow">→</div>
+    </div>
+  </div>
+
+  <div class="auth-box">
+    <div class="auth-title">Gem din plan</div>
+    <div class="auth-body">Den ligger kun i denne browser. Opret en konto, så gemmes den
+      også i skyen og følger med til din telefon.</div>
+    <div class="auth-row">
+      <input type="email" placeholder="din@email.dk" autocomplete="email">
+    </div>
+    <div class="auth-row">
+      <input type="password" placeholder="Adgangskode (min. 8 tegn)" autocomplete="new-password">
+      <button class="btn-outline">Opret</button>
+    </div>
+    <span class="pv-new">adgangskode er ny</span>
+    <div class="auth-or">eller</div>
+    <div class="auth-row">
+      <button class="btn-outline" style="flex:1">Send mig et login-link i stedet</button>
+    </div>
+    <div class="auth-consent">Vi gemmer din email for at kunne logge dig ind og sende dig
+      din plan. Intet andet. <a href="/privacy">Privatlivspolitik</a></div>
+  </div>
+</section>
+
+<!-- ============ KALENDER-FANEN ============ -->
+<section id="v-cal" hidden>
+  <div class="profile-top">
+    <div class="profile-top-icon">
+      <svg viewBox="0 0 16 16"><polyline points="2,11 5,7 8,9 11,5 14,7"/></svg>
+    </div>
+    <span class="profile-top-text">42 km løb</span>
+  </div>
+
+  <div class="tabs">
+    <button class="plan-tab active">Kalender</button>
+    <button class="plan-tab">Plan</button>
+    <button class="plan-tab">Tal</button>
+  </div>
+
+  <div class="sess">
+    <div class="sess-head">
+      <div class="sess-when">I dag · uge 3 · BASE</div>
+      <div class="sess-title">Rolig tur · 8 km</div>
+    </div>
+    <div class="sess-desc"><span class="k">Rolige kilometer i zone 2. Hold tempoet så lavt at du kan holde en samtale hele vejen.</span>
+Tempo: 5:30-6:00 /km
+Ernæring: 500 ml vand
+Før træning: havregryn 2 timer før
+BASE</div>
+    <div class="sess-foot">
+      <button class="btn">Log den</button>
+      <button class="btn-small">Kopiér til Strava <span class="pv-new">ny</span></button>
+    </div>
+  </div>
+
+  <div class="auth-box">
+    <div class="auth-title">Gem din plan <span class="pv-new">flyttet hertil</span></div>
+    <div class="auth-body">Den ligger kun i denne browser. Opret en konto, så gemmes den
+      også i skyen.</div>
+    <div class="auth-row">
+      <input type="email" placeholder="din@email.dk" autocomplete="email">
+    </div>
+    <div class="auth-row">
+      <input type="password" placeholder="Adgangskode (min. 8 tegn)" autocomplete="new-password">
+      <button class="btn-outline">Opret</button>
+    </div>
+    <div class="auth-consent">Vi gemmer din email for at kunne logge dig ind.
+      <a href="/privacy">Privatlivspolitik</a></div>
+  </div>
+</section>
+
+<div class="lang-toggle">
+  <button class="on">DA</button>
+  <button>EN</button>
+</div>
+
+<script>
+  var secs = {in:document.getElementById("v-in"), out:document.getElementById("v-out"), cal:document.getElementById("v-cal")};
+  document.querySelectorAll(".pv-bar button").forEach(function(b){
+    b.onclick = function(){
+      document.querySelectorAll(".pv-bar button").forEach(function(x){x.classList.remove("on");});
+      b.classList.add("on");
+      Object.keys(secs).forEach(function(k){ secs[k].hidden = (k !== b.dataset.v); });
+    };
+  });
+</script>
+</body>
+</html>
