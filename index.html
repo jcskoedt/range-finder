@@ -3196,11 +3196,16 @@ function renderTabToday(plan,c){
       <div class="upload-hint">${t("import_formats")}</div>
     </div></div>
   </div>
+  ${authBoxHtml()}
   <div style="height:32px;"></div>`;
 
   // Moved here with the markup it drives. Dropping this call is exactly
   // how the import box went unreachable once before.
   wireUploadArea();
+  // Same rule for the sign-in box, which moved here from the PLAN tab. This is
+  // the tab planTab starts on, so the nudge is now on the page you land on
+  // rather than one tab over.
+  wireAuthBox();
 
   // Wire log button
   if(ts){
@@ -3429,7 +3434,6 @@ function renderTabPlan(plan,c){
     </div>
     <div class="share-hint" id="shareHint"></div>
   </div>
-  ${authBoxHtml()}
 `;
 
   // Build the link now, not on click. writeText() needs the click to still count
@@ -3446,7 +3450,6 @@ function renderTabPlan(plan,c){
     hint.textContent=!n?t("export_ical_none"):n===1?t("export_ical_done_one"):t("export_ical_done_many",{n:n});
   };
 
-  wireAuthBox();
 
   const shareBtn=document.getElementById("sharePlanBtn");
   if(shareBtn)shareBtn.onclick=async()=>{
