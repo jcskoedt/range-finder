@@ -1,5 +1,5 @@
 # Range Finder — TODO
-Sidst opdateret: 2026-09-07
+Sidst opdateret: 2026-09-08
 
 B1 (AI-plangenerering) og B2 (replan) er færdige og i produktion. Se `HANDOFF.md` for hvordan projektet hænger sammen.
 
@@ -45,11 +45,13 @@ CEO-planens Gate 0. Stadig ikke gjort, og det er det eneste der kan besvare om A
 
 ### Og to ting mere du skal vide
 
-**Advarselsmailen er bygget, men den sender ingenting endnu.** `api/retention-warn.js` er skrevet, og `vercel.json` har fået et dagligt cron-job kl. 04:00 UTC. Uden `RESEND_API_KEY` og `RESEND_FROM` svarer den `200` med `skipped: "resend_not_configured"` og antallet der venter — med vilje, frem for at fejle: et cron-job der fejler hver dag i ugevis lærer dig at ignorere cron-fejl, og så er den rigtige fejl også usynlig.
+**Advarselsmailen er deployet, men sender ingenting endnu.** `api/retention-warn.js` og det daglige cron-job kl. 04:00 UTC gik i produktion 2026-09-08 og er verificeret med kald: `503` uden `CRON_SECRET`, `405` på POST, og resten af siden upåvirket. Uden `RESEND_API_KEY` og `RESEND_FROM` vil den svare `200` med `skipped: "resend_not_configured"` og antallet der venter — med vilje, frem for at fejle: et cron-job der fejler hver dag i ugevis lærer dig at ignorere cron-fejl, og så er den rigtige fejl også usynlig.
+
+**Men lige nu er `CRON_SECRET` ikke sat, så den svarer 503 og cron-kørslen står som fejlet hver dag.** Det er den ene af de tre variabler der ikke afhænger af Resend. Sæt den, og kørslen virker fra i morgen: den finder 0 forfaldne og no-op'er pænt.
 
 Sletningen er nu spærret bag advarslen: `sweep_inactive()` rører ikke en konto der ikke har en advarsel på sig og 30 dage siden. Så indtil afsenderen kører, sletter systemet **ingenting** — det er den rigtige retning at fejle i, men det er stadig et løfte der ikke holdes, så det er tælleligt frem for tavst: `retention_status().overdue_unwarned` er antallet af konti der er forbi slettedatoen og kun lever fordi ingen har advaret dem. Den skal være 0.
 
-Hverken endpointet eller cron-nøglen i `vercel.json` er verificeret mod produktion — der er ikke deployet. `vercel.json` har fejlet to gange på ét døgn i dette projekt, så den skal verificeres med et kald, ikke ved at læse filen. Går den i stykker, fejler næste deploy; produktionen bliver ved med at servere det sidste gode deploy, så det er en fejlet build, ikke et nedbrud.
+`vercel.json` klarede det: build Ready på 11s, og forsiden, analytics-stien, `/privacy` og `/api/generate` svarer som før. Cron-*registreringen* er det eneste der ikke er verificeret — `vercel inspect` rapporterer ikke crons, så den skal ses i dashboardet under Cron Jobs, og det første rigtige bevis er en kørsel kl. 04:00 UTC.
 
 **`libraries` har RLS slået til og nul politikker.** De tre "own row"-politikker i `supabase/schema.sql` blev aldrig anvendt; fundet 2026-09-07 af Supabases egen advisor og bekræftet i `pg_policies`. Det er ikke et hul: RLS uden politikker nægter anon og authenticated alt, og `/api/sync` bruger service-rollen der springer RLS over, så appen er upåvirket. Filen er nu rettet til at sige det — politikkerne står kommenteret ud med hvorfor.
 

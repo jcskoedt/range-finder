@@ -1,5 +1,5 @@
 # Range Finder — Handoff
-Sidst opdateret: 2026-09-07
+Sidst opdateret: 2026-09-08
 
 ## Hvad det er
 
@@ -27,7 +27,7 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Privatlivspolitik | live på `/privacy`, med rigtige selskabsoplysninger |
 | Slet min konto | virker, verificeret: 204 og rækken væk via cascade |
 | Skrifttyper | selvhostet, ingen Google i anmodningskæden |
-| Opbevaringsregel (12 mdr.) | databasen er færdig og verificeret 7/7 — **afsenderen mangler tre env-variabler og et deploy**, se nedenfor |
+| Opbevaringsregel (12 mdr.) | databasen verificeret 7/7, endpointet deployet og verificeret — **mangler `CRON_SECRET` og Resend**, se nedenfor |
 
 **C er bygget og verificeret** — bortset fra opbevaringsreglen. Task 1-9 og 11 af `docs/superpowers/plans/2026-09-06-c-cloud-sync.md` er i produktion. Designet ligger i `docs/superpowers/specs/2026-09-06-c-cloud-sync-design.md`; læs den før du rører fletningen.
 
@@ -37,7 +37,11 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 >
 > **Sletningen er spærret bag advarslen.** `sweep_inactive()` rører ikke en konto uden en advarsel på sig og 30 dage siden. Fejler afsenderen, bliver konsekvensen derfor at *ingenting* slettes — ikke at nogen slettes uden at have hørt fra os. Det er den rigtige retning at fejle i, men det er stadig et løfte der ikke holdes, så det er gjort tælleligt: **`retention_status().overdue_unwarned` skal være 0.** Stiger den, kører afsenderen ikke.
 >
-> **Afsenderen mangler tre env-variabler og et deploy.** `api/retention-warn.js` er skrevet og `vercel.json` har et dagligt cron-job kl. 04:00 UTC, men uden `RESEND_API_KEY`, `RESEND_FROM` og `CRON_SECRET` svarer endpointet `200` med `skipped` og et antal. Hverken endpointet eller cron-nøglen er verificeret mod produktion — der er ikke deployet. Se `TODOS.md`, *Kræver dig*, punkt 2.
+> **Afsenderen er deployet og mangler tre env-variabler.** `api/retention-warn.js` og et dagligt Vercel-cron-job kl. 04:00 UTC gik i produktion 2026-09-08 (`8cd012d`, build Ready på 11s — `crons`-nøglen knækkede ikke den skrøbelige `vercel.json`). Målt mod produktion bagefter: `GET /api/retention-warn` svarer `503 {"error":"not_configured","missing":"CRON_SECRET"}`, `POST` svarer `405`, forsiden `200` med `no-store`, `/_vercel/insights/script.js` `200 application/javascript` og 3106 bytes uændret, og `/api/generate` afviser stadig en tom body med `400 invalid_sport`.
+>
+> **Cron-registreringen er ikke verificeret.** `vercel inspect` rapporterer ikke crons, og der er ingen CLI-kommando til det. Den står i dashboardet under Cron Jobs, og det første rigtige bevis er en kørsel kl. 04:00 UTC.
+>
+> Tilbage: `CRON_SECRET`, `RESEND_API_KEY` og `RESEND_FROM` i Vercels Production-env. **`CRON_SECRET` afhænger ikke af Resend** og kan sættes med det samme; indtil den er sat, svarer endpointet 503 og cron-kørslen står som fejlet i dashboardet hver dag. Ingen skade — der sendes intet og slettes intet — men reglen gør ingenting. Se `TODOS.md`, *Kræver dig*, punkt 2.
 >
 > Rækkefølgen i endpointet er ikke til forhandling: **send først, registrér bagefter.** Omvendt ville en fejlet afsendelse tælle som en advarsel, og 30 dage senere ryger kontoen uden at nogen har hørt fra os.
 
@@ -68,6 +72,12 @@ curl -s -m 90 -X POST https://rangefinderapp.vercel.app/api/generate \
   -d '{"sport":"lob","fitness_level":"Motionist","longest_session_km":10,"target_km":42,"plan_weeks":4,"goal_event":"maraton","language":"da"}'
 ```
 Skal give en JSON-plan med fire uger. Tager 7-15 sek.
+
+### Test at opbevaringsreglen er i luften
+```bash
+curl -s -w "\nHTTP %{http_code}\n" https://rangefinderapp.vercel.app/api/retention-warn
+```
+Uden `CRON_SECRET` sat: `503 {"error":"not_configured","missing":"CRON_SECRET"}`. Med den sat, men uden header: `401`. Får du `404`, er funktionen ikke deployet; får du `text/html`, sluger en rute stien.
 
 ### Prompt-validering — kør før du ændrer i prompten
 ```bash
