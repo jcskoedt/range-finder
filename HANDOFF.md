@@ -1,5 +1,5 @@
 # Range Finder — Handoff
-Sidst opdateret: 2026-09-08
+Sidst opdateret: 2026-09-08 (2)
 
 ## Hvad det er
 
@@ -27,6 +27,9 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Privatlivspolitik | live på `/privacy`, med rigtige selskabsoplysninger |
 | Slet min konto | virker, verificeret: 204 og rækken væk via cascade |
 | Skrifttyper | selvhostet, ingen Google i anmodningskæden |
+| Profilside | virker, verificeret i browseren: `hero-video.mp4` optræder **ikke** i resource-timelinen |
+| Adgangskode-login | bygget, magic link beholdt som alternativ. Aktivering kræver stadig mail |
+| Kopiér til Strava | virker, teksten er byte-identisk med `.ics`-beskrivelsen |
 | Opbevaringsregel (12 mdr.) | databasen verificeret 7/7, endpointet deployet og verificeret — **mangler `CRON_SECRET` og Resend**, se nedenfor |
 
 **C er bygget og verificeret** — bortset fra opbevaringsreglen. Task 1-9 og 11 af `docs/superpowers/plans/2026-09-06-c-cloud-sync.md` er i produktion. Designet ligger i `docs/superpowers/specs/2026-09-06-c-cloud-sync-design.md`; læs den før du rører fletningen.
@@ -215,6 +218,18 @@ Den vigtigste lektie er ikke fejlene, men at **gaten skjulte den første.** Alle
 ### Mailen er den skjulte forudsætning
 
 Supabases indbyggede mailserver sender **kun til medlemmer af projektets egen organisation**, med et loft på 2 i timen. Magic link virker derfor perfekt når du tester på dig selv og fejler for hver rigtig bruger, med `Email address not authorized` og ingen synlig fejl i appen. Custom SMTP via Resend er ikke valgfrit. Kilde: supabase.com/docs/guides/auth/auth-smtp.
+
+### Profilsiden hviler på ét bit i localStorage
+
+`init()` kalder `renderLibrary(true)` **før** `await loadIndex()`, og indekset går gennem `window.storage` med timeout — det kan ikke læses synkront. Rutede man landing/profil på `planIndex.length`, tegnede første paint hero'en med `<video autoplay>` og skiftede et øjeblik efter. De 27 MB blev hentet alligevel, og hele splittet var pynt.
+
+Derfor `hasPlans` i localStorage, skrevet ved siden af hver indeks-skrivning i `saveIndex()` og seedet i `init()` for planer der er ældre end bittet.
+
+**Verifikationen er en måling, ikke et øjekast:** `performance.getEntriesByType("resource")` må ikke indeholde `hero-video.mp4` når der er planer. Målt 2026-09-08: den gør den ikke. At `#heroVideo` er `null` er ikke nok at tjekke alene — det er målingen der siger at bytes ikke blev hentet.
+
+### `openPhaseKey` er visningsnavnet, ikke `phaseKey`
+
+Kostede tid under verifikationen af PLAN-fanen: `data-phase` bærer `w.phase` (`BASE`, `Loebsuge`), ikke `w.phaseKey` (`base`). Sætter du `openPhaseKey='base'` i hånden, renderer sessionslisten ingenting, og det ser ud som en fejl i koden. Klik dig frem i stedet: `.phase-head[data-phase]` og derefter `.phase-week-card[data-weekidx]`.
 
 ## Det der kostede tid — læs dette før du ændrer noget
 

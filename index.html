@@ -3018,7 +3018,11 @@ function renderWizard(){
     state.activePlan=plan;state.view="plan";render();
   };
 }
-function alertInline(btnId,msg){const btn=document.getElementById(btnId);const old=btn.textContent;btn.textContent=msg;setTimeout(()=>{btn.textContent=old;},2200);}
+// Guarded because callers reach it after an await. copySessionDescription waits
+// on the clipboard, and if the view re-renders during that wait the button is
+// gone — an unguarded lookup threw an unhandled rejection into the console for
+// a copy that had already succeeded.
+function alertInline(btnId,msg){const btn=document.getElementById(btnId);if(!btn)return;const old=btn.textContent;btn.textContent=msg;setTimeout(()=>{btn.textContent=old;},2200);}
 
 /* ---------------- PLAN VIEW ---------------- */
 function keyFor(w,i){return w+"_"+i;}

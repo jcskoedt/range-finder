@@ -144,7 +144,7 @@ Hegnet holdt. `applyDoc()` beholder lokale planer der ikke er tombstonede, og `s
 
 **Workaround indtil adgangskode er bygget:** kopiér linkadressen frem for at klikke, og indsæt den i den browser hvor planen er. Virker kun fordi projektet valgte implicit flow frem for PKCE — tokenet ligger i hashet, så linket er ikke bundet til den browser der bad om det.
 
-- [ ] **Hent før du skriver, når det lokale bibliotek er tomt.** Et login fra en kontekst med nul planer har intet at bidrage med og alt at modtage, men skubber i dag sit tomme bibliotek op og gør sig til version 1. Er begge tomme, skal appen sige det — "ingen planer fundet i skyen, lavede du din plan i en anden browser?" — frem for at vise en tom side. Rører fletningen, så testtilfældet skal ind i `scripts/validate-sync.mjs` først.
+- [x] ~~**Hent før du skriver**~~ **fravalgt, og beskeden bygget i stedet** `aca31c6`. Gennemgangen viste at hentningen ikke køber noget: et tomt dokument mod en eksisterende række tager allerede konflikt-grenen og fletter, og mod en manglende række overskriver den ingenting. Tavsheden var hele fejlen. Et login fra en kontekst med nul planer har intet at bidrage med og alt at modtage, men skubber i dag sit tomme bibliotek op og gør sig til version 1. Er begge tomme, skal appen sige det — "ingen planer fundet i skyen, lavede du din plan i en anden browser?" — frem for at vise en tom side. Rører fletningen, så testtilfældet skal ind i `scripts/validate-sync.mjs` først.
 
 ---
 
@@ -162,7 +162,7 @@ Layout: planerne er siden, kontoen en stille fod. Email + sync-badge + log ud sy
 
 **Ikke med:** fremdrift på plan-kortene. `state.planIndex` bærer ikke fremdrift, så hvert kort ville kræve at hele plandokumentet blev læst ved hver render. Egen opgave. Og RLS-politikkerne er stadig ikke nødvendige: profilen læser localStorage, ikke Supabase.
 
-- [ ] Byg profilsiden
+- [x] ~~Byg profilsiden~~ `dbd1c2d`, verificeret i browseren 2026-09-08: `hero-video.mp4` ikke i resource-timelinen, profil-wordmark og kontofod på plads, plan-kort renderet.
 
 ### Adgangskode ved siden af magic link
 
@@ -174,14 +174,14 @@ Konsekvensen: adgangskode fjerner **ikke** Resend-afhængigheden. Oprettelsen se
 
 Adgangskode er stadig værd at bygge, af en anden grund end den oprindelige: **det er kun aktiveringen der kræver mailen.** Hvert login bagefter sker i den browser brugeren sidder i, uden link og uden mail-app-browser — og det er hele fejlklassen fra fejlen 2026-09-08, hvor sessionen og planen endte i to forskellige localStorage.
 
-- [ ] Byg adgangskode-login i `index.html`
+- [x] ~~Byg adgangskode-login~~ `38dc729`. Verificeret: begge felter, begge valideringsbeskeder, alle strenge i DA og EN.
 - [ ] **Kræver dig, og det åbner Gate 0 uden Resend:** opret de fem testbrugere i hånden. Authentication → Users → Add user → kryds i *Auto Confirm User* → udlever adresse og adgangskode. Bekræftelse er stadig krævet for alle andre; du springer den kun for fem konti du selv opretter.
 
 ### "Gem din plan" flytter til Kalender-fanen
 
 `authBoxHtml()` ligger på linje 3276 inde i `renderTabPlan`; kalender-fanen er `today` (`tab_today` = "Kalender"), altså `renderTabToday`. Den bliver mere synlig, ikke mindre — `planTab` starter på `"today"`. `wireAuthBox()` skal kaldes i samme funktion som rendrer den, jf. kommentaren over funktionen.
 
-- [ ] Flyt den
+- [x] ~~Flyt den~~ `1f70e5d`. Verificeret: boksen er på Kalender-fanen og væk fra PLAN-fanen.
 
 ### Kopiér træningsbeskrivelse til Strava
 
@@ -189,7 +189,7 @@ Samme tekst som iCal-beskrivelsen: coach-note, `Tempo:`, `Ernæring:`, `Før tr�
 
 **Må ikke `await` noget før `navigator.clipboard.writeText`.** Det var præcis det der gjorde at kopiér-knappen til delelinks aldrig virkede: `await` på gzip brugte klikkets clipboard-tilladelse op. Teksten bygges synkront og skal blive det.
 
-- [ ] Byg knappen
+- [x] ~~Byg knappen~~ `7946650`. Verificeret: teksten er byte-identisk med `.ics`-beskrivelsen målt gennem appens egen `icsEscape`, og klikket kollapser ikke sessionen.
 
 ### Afsendernavn i mails
 
