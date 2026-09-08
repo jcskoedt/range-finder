@@ -134,6 +134,20 @@ Kørt mod den live side med målinger, ikke skøn. Lukket: farvekontrast (`--sub
 
 ---
 
+## Fejl fundet 2026-09-08: planen forsvandt efter magic link
+
+**Rodårsag fastslået, ingen data tabt.** Mail-appen åbner magic link-mailen i sin egen indbyggede browser, som har sin egen localStorage. Appen starter dér med et tomt bibliotek, logger ind, og skubber det tomme bibliotek op som version 1. Planen ligger uberørt i den browser hvor den blev lavet — og den browser har aldrig fået en session, så den har aldrig synkroniseret. Sessionen og dataen endte to forskellige steder.
+
+Målt i databasen: én synkronisering nogensinde, `version` 1, 0 planer, 61 bytes. Bekræftet af Jacob: planen er der når siden åbnes direkte.
+
+Hegnet holdt. `applyDoc()` beholder lokale planer der ikke er tombstonede, og `syncBaseVersion` nulstilles ved hver page load, så et tomt dokument altid møder en fletning frem for at overskrive.
+
+**Workaround indtil adgangskode er bygget:** kopiér linkadressen frem for at klikke, og indsæt den i den browser hvor planen er. Virker kun fordi projektet valgte implicit flow frem for PKCE — tokenet ligger i hashet, så linket er ikke bundet til den browser der bad om det.
+
+- [ ] **Hent før du skriver, når det lokale bibliotek er tomt.** Et login fra en kontekst med nul planer har intet at bidrage med og alt at modtage, men skubber i dag sit tomme bibliotek op og gør sig til version 1. Er begge tomme, skal appen sige det — "ingen planer fundet i skyen, lavede du din plan i en anden browser?" — frem for at vise en tom side. Rører fletningen, så testtilfældet skal ind i `scripts/validate-sync.mjs` først.
+
+---
+
 ## Næste bundt — designet, venter på et ja
 
 Fire ting besluttet 2026-09-08. Mockup: `profile-preview.html`, åbnes direkte fra disk. Intet af det er bygget endnu.
@@ -154,10 +168,14 @@ Layout: planerne er siden, kontoen en stille fod. Email + sync-badge + log ud sy
 
 Besluttet: **begge.** Email + adgangskode øverst, "send mig et link i stedet" under.
 
-Grunden er større end bekvemmelighed: **adgangskode virker uden Resend.** Slås email-bekræftelse fra i Supabase, oprettes en konto uden at der sendes en mail, og så venter Gate 0 ikke længere på DNS. Prisen er at adresserne ikke er verificerede — en tastefejl låser folk ude uden nulstilling, og advarselsmailen i opbevaringsreglen har ingen adresse den kan stole på. Det bliver rigtigt igen når Resend er på plads; adgangskoden udskyder afhængigheden, den fjerner den ikke.
+**Besluttet 2026-09-08: email skal godkendes før en konto er aktiv.** *Confirm email* bliver stående. Forslaget om at slå den fra er afvist, og det er en bevidst afvejning, ikke en glemsel — så skriv den ikke op igen.
+
+Konsekvensen: adgangskode fjerner **ikke** Resend-afhængigheden. Oprettelsen sender en bekræftelsesmail, og den indbyggede mailserver leverer kun til medlemmer af Supabase-organisationen, så en testbruger får ingen mail og en død konto. Resend er tilbage på den kritiske vej.
+
+Adgangskode er stadig værd at bygge, af en anden grund end den oprindelige: **det er kun aktiveringen der kræver mailen.** Hvert login bagefter sker i den browser brugeren sidder i, uden link og uden mail-app-browser — og det er hele fejlklassen fra fejlen 2026-09-08, hvor sessionen og planen endte i to forskellige localStorage.
 
 - [ ] Byg adgangskode-login i `index.html`
-- [ ] **Kræver dig:** Supabase → Authentication → Providers → Email → slå *Confirm email* fra. Uden det sender adgangskode-oprettelse stadig en bekræftelsesmail, og så er vi tilbage i mail-afhængigheden.
+- [ ] **Kræver dig, og det åbner Gate 0 uden Resend:** opret de fem testbrugere i hånden. Authentication → Users → Add user → kryds i *Auto Confirm User* → udlever adresse og adgangskode. Bekræftelse er stadig krævet for alle andre; du springer den kun for fem konti du selv opretter.
 
 ### "Gem din plan" flytter til Kalender-fanen
 
