@@ -238,7 +238,7 @@ Tjek en platform-sti sådan her, ikke ved at kigge på konfigurationen:
 curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
   https://rangefinderapp.vercel.app/_vercel/insights/script.js
 ```
-HTML betyder at en rute sluger den. De seks eksplicitte statiske ruter er overflødige nu, men står der stadig.
+HTML betyder at en rute sluger den. De fem eksplicitte statiske ruter er fjernet 2026-09-08: de lå alle efter `handle: filesystem` og pegede en sti på sig selv, så filsystem-fasen havde allerede serveret dem. Catch-all'ens `/(?!_vercel/)(.*)` er det der bærer rettelsen, og den står uændret.
 
 ### Replan havde aldrig virket — to fejl der skjulte hinanden
 Fundet 2026-09-06 ved at teste `replan_used`-eventet ende til ende. Endpointet havde ligget i produktion i et døgn uden nogensinde at svare 200.
