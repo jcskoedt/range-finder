@@ -805,6 +805,15 @@ body{
 }
 .acct-fold{padding-top:12px;display:flex;flex-direction:column;gap:10px;}
 .acct-fold p{font-size:11.5px;color:var(--subtle);line-height:1.5;max-width:46ch;}
+
+/* Signed in with an empty library. Sits above the hero on purpose: it is the
+   answer to "where did my plan go", and an answer buried under a full-height
+   hero video is not an answer. */
+.notice-box{
+  margin:16px 24px 0;padding:14px 16px;border:2px solid var(--border);background:var(--yellow);
+}
+.notice-title{font-family:'Turret Road',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px;}
+.notice-body{font-size:13px;line-height:1.55;max-width:54ch;}
 .sync-badge{
   position:fixed;bottom:22px;left:16px;z-index:50;
   font-size:10px;font-weight:200;letter-spacing:0.1em;text-transform:uppercase;
@@ -1219,6 +1228,8 @@ en:{
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
   share_plan:"Share this plan", export_ical:"Add to calendar (.ics)", copy_desc:"Copy for Strava", copy_done:"Copied", copy_failed:"Could not copy",
   auth_save_title:"Keep this plan safe", auth_save_body:"It only lives in this browser. Sign in and it is backed up too.", acct_section:"Account",
+  empty_cloud_title:"Nothing in this browser yet",
+  empty_cloud_body:"You are signed in, but there are no plans here. If you made one in another browser it is still there, untouched — open the app in that browser and sign in, and it syncs from there. Mail apps open links in a browser of their own, which is not the one you were using.",
   auth_email_ph:"you@email.com", auth_send:"Send sign-in link", auth_sent:"Check your inbox.",
   auth_failed:"Could not send the link. Try again.", auth_signout:"Sign out", auth_signed_in:"Signed in as {email}",
   auth_consent:"Your address is used for one thing: sending you a sign-in link. Your plans and progress are stored so you can get them back. Nothing else, and no marketing.",
@@ -1381,6 +1392,8 @@ da:{
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
   share_plan:"Del denne plan", export_ical:"Læg i kalender (.ics)", copy_desc:"Kopiér til Strava", copy_done:"Kopieret", copy_failed:"Kunne ikke kopiere",
   auth_save_title:"Gem din plan", auth_save_body:"Den ligger kun i denne browser. Log ind, så gemmes den også i skyen.", acct_section:"Konto",
+  empty_cloud_title:"Der er ikke noget i denne browser endnu",
+  empty_cloud_body:"Du er logget ind, men der ligger ingen planer her. Lavede du en i en anden browser, ligger den der stadig og er urørt — åbn appen der og log ind, så synkroniseres den derfra. Mail-apps åbner links i deres egen browser, og det er ikke den du sad i.",
   auth_email_ph:"din@email.dk", auth_send:"Send login-link", auth_sent:"Tjek din indbakke.",
   auth_failed:"Linket kunne ikke sendes. Prøv igen.", auth_signout:"Log ud", auth_signed_in:"Logget ind som {email}",
   auth_consent:"Din adresse bruges til én ting: at sende dig et login-link. Dine planer og din fremdrift gemmes, så du kan få dem igen. Ikke andet, og ingen markedsføring.",
@@ -2620,7 +2633,18 @@ function renderLanding(loading){
     </details>
   `;
 
-  app.innerHTML=sharedCardHtml()+heroHtml+plansSectionHtml(loading)+howHtml;
+  // Signed in, and nothing here. That is the magic-link trap: the mail app opens
+  // the link in a browser of its own, with its own localStorage, so the session
+  // lands in a context that never held the plan. Nothing is lost — the plan is
+  // in the browser it was made in — but saying nothing reads as "my plan is
+  // gone", which is exactly how it read the first time it happened.
+  const emptyCloudHtml=(!loading&&state.session&&idx.length===0)?`
+    <div class="notice-box">
+      <div class="notice-title">${t("empty_cloud_title")}</div>
+      <div class="notice-body">${t("empty_cloud_body")}</div>
+    </div>`:"";
+
+  app.innerHTML=emptyCloudHtml+sharedCardHtml()+heroHtml+plansSectionHtml(loading)+howHtml;
 
   wireSharedCard();
 
