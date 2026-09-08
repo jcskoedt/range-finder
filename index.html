@@ -1217,7 +1217,7 @@ en:{
   notice_ratelimit:"You've made a lot of plans in a short time. This one uses our own algorithm.",
   notice_too_large:"A plan that long is better handled by our own algorithm than by the AI coach — so that is what this one is.",
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
-  share_plan:"Share this plan", export_ical:"Add to calendar (.ics)",
+  share_plan:"Share this plan", export_ical:"Add to calendar (.ics)", copy_desc:"Copy for Strava", copy_done:"Copied", copy_failed:"Could not copy",
   auth_save_title:"Keep this plan safe", auth_save_body:"It only lives in this browser. Sign in and it is backed up too.", acct_section:"Account",
   auth_email_ph:"you@email.com", auth_send:"Send sign-in link", auth_sent:"Check your inbox.",
   auth_failed:"Could not send the link. Try again.", auth_signout:"Sign out", auth_signed_in:"Signed in as {email}",
@@ -1379,7 +1379,7 @@ da:{
   notice_ratelimit:"Du har lavet mange planer på kort tid. Denne er lavet med vores egen algoritme.",
   notice_too_large:"Så lang en plan laver vores egen algoritme bedre end AI-coachen — så det er den, du får her.",
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
-  share_plan:"Del denne plan", export_ical:"Læg i kalender (.ics)",
+  share_plan:"Del denne plan", export_ical:"Læg i kalender (.ics)", copy_desc:"Kopiér til Strava", copy_done:"Kopieret", copy_failed:"Kunne ikke kopiere",
   auth_save_title:"Gem din plan", auth_save_body:"Den ligger kun i denne browser. Log ind, så gemmes den også i skyen.", acct_section:"Konto",
   auth_email_ph:"din@email.dk", auth_send:"Send login-link", auth_sent:"Tjek din indbakke.",
   auth_failed:"Linket kunne ikke sendes. Prøv igen.", auth_signout:"Log ud", auth_signed_in:"Logget ind som {email}",
@@ -1788,8 +1788,37 @@ function icsDate(d){
   return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
 }
 
-function planToIcs(plan){
+// One session as prose: the coach note, the pace, what to eat, and the phase.
+// Exported from the calendar export rather than duplicated for it — the copy
+// button and the .ics file have to say the same thing, and two builders would
+// drift the first time a line was added to one of them.
+function sessionDescription(plan,item,phase){
   const sport=SPORTS[plan.sport];
+  const[label,km,note,kind]=item;
+  const fuel=sport.fuelFn(km);
+  return [
+    note||"",
+    t("pace")+": "+sport.tempoFn(label,km,note,kind),
+    t("nutrition")+": "+fuel.during,
+    fuel.before?t("fuel_before_label")+": "+fuel.before:"",
+    phase,
+  ].filter(Boolean).join("\n");
+}
+
+// Copies it. navigator.clipboard first, legacyCopy second — the same ladder the
+// share button uses. Nothing is awaited before writeText: awaiting first is
+// exactly what stopped the share button from ever copying, because the click's
+// clipboard permission was spent by the time it got there. sessionDescription
+// is synchronous, so there is nothing to await anyway. Keep it that way.
+async function copySessionDescription(plan,item,phase,btnId){
+  const text=sessionDescription(plan,item,phase);
+  let copied=false;
+  try{await navigator.clipboard.writeText(text);copied=true;}catch(e){}
+  if(!copied)copied=legacyCopy(text);
+  alertInline(btnId,copied?t("copy_done"):t("copy_failed"));
+}
+
+function planToIcs(plan){
   const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
   const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Range Finder//Training Plan//EN",
     "CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:"+icsEscape(plan.label)];
@@ -1808,17 +1837,9 @@ function planToIcs(plan){
     w.items.forEach((item,i)=>{
       const sd=getSessionDate(plan,wIdx,i);
       if(!sd)return;
-      const[label,km,note,kind]=item;
-      const fuel=sport.fuelFn(km);
-      const desc=[
-        note||"",
-        t("pace")+": "+sport.tempoFn(label,km,note,kind),
-        t("nutrition")+": "+fuel.during,
-        fuel.before?t("fuel_before_label")+": "+fuel.before:"",
-        w.phase,
-      ].filter(Boolean).join("\n");
+      const[label,km]=item;
       push("rf-"+plan.id+"-"+wIdx+"-"+i+"@rangefinderapp.vercel.app",
-        new Date(sd),label+" · "+fmtKm(km)+" km",desc);
+        new Date(sd),label+" · "+fmtKm(km)+" km",sessionDescription(plan,item,w.phase));
     });
   });
 
@@ -3059,6 +3080,7 @@ function renderTabToday(plan,c){
         </div>
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <button class="btn btn-outline" id="todayMoveBtn" style="font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);">${t("move_session")}</button>
+          <button class="btn btn-outline" id="todayCopyBtn" style="font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);">${t("copy_desc")}</button>
           <button class="btn btn-outline" id="todayUndoBtn" style="font-size:11px;padding:6px 14px;min-height:32px;border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.45);">${t("undo")}</button>
         </div>
         <div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.4);">${fmtDate(selDate)}</div>
@@ -3071,6 +3093,7 @@ function renderTabToday(plan,c){
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn" id="todayLogBtn" style="font-size:12px;padding:10px 20px;">${t("log_session")}</button>
           <button class="btn btn-outline" id="todayMoveBtn" style="font-size:11px;padding:6px 14px;min-height:32px;">${t("move_session")}</button>
+          <button class="btn btn-outline" id="todayCopyBtn" style="font-size:11px;padding:6px 14px;min-height:32px;">${t("copy_desc")}</button>
         </div>
       </div>`;
     }
@@ -3186,6 +3209,8 @@ function renderTabToday(plan,c){
     if(lb)lb.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=true;if(!cur.actualKm)cur.actualKm=km;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);renderTabToday(plan,c);};
     const ub=document.getElementById("todayUndoBtn");
     if(ub)ub.onclick=async()=>{const cur=plan.progress[ikey]||{done:false,actualKm:null};cur.done=false;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);renderTabToday(plan,c);};
+    const cb=document.getElementById("todayCopyBtn");
+    if(cb)cb.onclick=()=>copySessionDescription(plan,ts.item,ts.w.phase,"todayCopyBtn");
     const kmI=document.getElementById("todayActKm");
     if(kmI){kmI.onclick=(e)=>e.stopPropagation();kmI.onchange=async(e)=>{const cur=plan.progress[ikey]||{done:true};cur.actualKm=e.target.value;plan.progress[ikey]=stampProgress(cur);await savePlan(plan);};}
     // Wire move button
@@ -3353,6 +3378,7 @@ function renderTabPlan(plan,c){
               </div>
               ${p.source?`<div class="item-source">↑ ${p.source}</div>`:''}
               ${!p.done?`<button class="btn" style="margin-top:12px;font-size:12px;padding:10px 18px;" data-logbtn="${ikey}" data-weekidx="${openWeekIdx}" data-i="${i}" data-km="${km}">${t("mark_done",{km:fmtKm(km)})}</button>`:''}
+              <button class="btn btn-outline" style="margin-top:12px;font-size:11px;padding:8px 14px;min-height:32px;" id="copyBtn-${ikey}" data-copybtn="${ikey}" data-weekidx="${openWeekIdx}" data-i="${i}">${t("copy_desc")}</button>
             </div>
           </li>`;
         });
@@ -3486,6 +3512,18 @@ function renderTabPlan(plan,c){
     };
   });
   // Log buttons
+  c.querySelectorAll("[data-copybtn]").forEach(btn=>{
+    btn.onclick=(e)=>{
+      // The row toggles open and shut on click, so the button must not let the
+      // click reach it — copying would collapse the session you copied from.
+      e.stopPropagation();
+      const wIdx=Number(btn.dataset.weekidx),i=Number(btn.dataset.i);
+      const w=plan.weeks[wIdx];
+      if(!w||!w.items[i])return;
+      copySessionDescription(plan,w.items[i],w.phase,"copyBtn-"+btn.dataset.copybtn);
+    };
+  });
+
   c.querySelectorAll("[data-logbtn]").forEach(btn=>{
     btn.onclick=async(e)=>{
       e.stopPropagation();
