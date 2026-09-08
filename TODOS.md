@@ -1,5 +1,5 @@
 # Range Finder — TODO
-Sidst opdateret: 2026-09-08
+Sidst opdateret: 2026-09-08 (2)
 
 B1 (AI-plangenerering) og B2 (replan) er færdige og i produktion. Se `HANDOFF.md` for hvordan projektet hænger sammen.
 
@@ -131,6 +131,53 @@ Kørt mod den live side med målinger, ikke skøn. Lukket: farvekontrast (`--sub
 - [ ] **Vilkår og betingelser.** Ikke strengt påkrævet for en gratis app, men god skik når der er konti.
 - [ ] **Engelsk privatlivspolitik.** Appen er tosproget; politikken er kun dansk. Skal på plads før appen vises til nogen der ikke læser dansk.
 - [ ] **Copyright på `hero-video.mp4` og `logo.png`.** Egne optagelser eller stock med licens? Kan kun besvares af Jacob.
+
+---
+
+## Næste bundt — designet, venter på et ja
+
+Fire ting besluttet 2026-09-08. Mockup: `profile-preview.html`, åbnes direkte fra disk. Intet af det er bygget endnu.
+
+### Profilsiden
+
+Ruter på om der er planer, **uden** en femte værdi i `state.view` — noten nedenfor antog at den var nødvendig, men når forsiden forsvinder ved planer, er valget afledt frem for gemt. `renderLibrary()` splittes i `renderLanding()` og `renderProfile()`. Sletter du din sidste plan, falder du tilbage til salgsforsiden af sig selv.
+
+**Første paint er den svære del.** `init()` kalder `renderLibrary(true)` *før* `state.planIndex=await loadIndex()`, og indekset går gennem `window.storage.get()` og kan ikke læses synkront. Ruter man på `planIndex.length`, tegner første paint salgsforsiden med `<video autoplay>` og swapper bagefter — så hentes de 27 MB alligevel, og feature'en ville se ud som om den virkede. Fixet er en `hasPlans`-nøgle i localStorage, skrevet af `saveIndex()` og læst synkront i `init()`.
+
+Layout: planerne er siden, kontoen en stille fod. Email + sync-badge + log ud synligt, `Slet min konto` bag en `<details>`. Wordmark-linje øverst, fordi hero'en er det eneste sted der er branding i dag. `#langToggle` kræver intet — den ligger uden for `#app` og er allerede `position:fixed`.
+
+**Ikke med:** fremdrift på plan-kortene. `state.planIndex` bærer ikke fremdrift, så hvert kort ville kræve at hele plandokumentet blev læst ved hver render. Egen opgave. Og RLS-politikkerne er stadig ikke nødvendige: profilen læser localStorage, ikke Supabase.
+
+- [ ] Byg profilsiden
+
+### Adgangskode ved siden af magic link
+
+Besluttet: **begge.** Email + adgangskode øverst, "send mig et link i stedet" under.
+
+Grunden er større end bekvemmelighed: **adgangskode virker uden Resend.** Slås email-bekræftelse fra i Supabase, oprettes en konto uden at der sendes en mail, og så venter Gate 0 ikke længere på DNS. Prisen er at adresserne ikke er verificerede — en tastefejl låser folk ude uden nulstilling, og advarselsmailen i opbevaringsreglen har ingen adresse den kan stole på. Det bliver rigtigt igen når Resend er på plads; adgangskoden udskyder afhængigheden, den fjerner den ikke.
+
+- [ ] Byg adgangskode-login i `index.html`
+- [ ] **Kræver dig:** Supabase → Authentication → Providers → Email → slå *Confirm email* fra. Uden det sender adgangskode-oprettelse stadig en bekræftelsesmail, og så er vi tilbage i mail-afhængigheden.
+
+### "Gem din plan" flytter til Kalender-fanen
+
+`authBoxHtml()` ligger på linje 3276 inde i `renderTabPlan`; kalender-fanen er `today` (`tab_today` = "Kalender"), altså `renderTabToday`. Den bliver mere synlig, ikke mindre — `planTab` starter på `"today"`. `wireAuthBox()` skal kaldes i samme funktion som rendrer den, jf. kommentaren over funktionen.
+
+- [ ] Flyt den
+
+### Kopiér træningsbeskrivelse til Strava
+
+Samme tekst som iCal-beskrivelsen: coach-note, `Tempo:`, `Ernæring:`, `Før træning:` hvis den findes, fasen. Bygges i dag inde i `planToIcs` (1786-1793) og flytter ud i en delt `sessionDescription()` som både eksporten og knappen kalder — ikke en kopi.
+
+**Må ikke `await` noget før `navigator.clipboard.writeText`.** Det var præcis det der gjorde at kopiér-knappen til delelinks aldrig virkede: `await` på gzip brugte klikkets clipboard-tilladelse op. Teksten bygges synkront og skal blive det.
+
+- [ ] Byg knappen
+
+### Afsendernavn i mails
+
+Afsendernavnet er `smtp_sender_name` og hører til custom SMTP, så From-adressen er Supabases indtil Resend er på plads. Men emne og brødtekst er separate felter og kan ændres nu.
+
+- [ ] **Kræver dig:** Supabase → Authentication → Emails → Magic Link. Emne: `Dit login-link til Range Finder`. Behold `{{ .ConfirmationURL }}` i brødteksten, ellers virker linket ikke.
 
 ---
 
