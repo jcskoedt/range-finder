@@ -779,6 +779,32 @@ body{
 }
 .auth-who{font-size:12px;color:var(--subtle);}
 .auth-consent{font-size:11.5px;color:var(--subtle);line-height:1.5;max-width:46ch;}
+
+/* The profile page. The hero used to carry the wordmark; without it the page
+   would open with no name on it. */
+.profile-top{display:flex;align-items:center;gap:8px;padding:20px 24px 0;}
+.profile-top-icon{
+  width:22px;height:22px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.profile-top-icon svg{width:14px;height:14px;fill:none;stroke:var(--text);stroke-width:2;}
+.profile-top-text{
+  font-family:'Turret Road',sans-serif;font-weight:700;font-size:15px;letter-spacing:0.02em;
+}
+
+/* The account foot. Quiet on purpose: this is a thing you touch twice a year,
+   and it sits under the plans rather than over them. */
+.acct{margin:36px 24px 0;border-top:2px solid var(--border);padding-top:14px;}
+.acct-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--subtle);}
+.acct-sync{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;}
+.acct-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}
+.acct details{margin-top:14px;}
+.acct summary{
+  font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--subtle);
+  cursor:pointer;font-weight:600;
+}
+.acct-fold{padding-top:12px;display:flex;flex-direction:column;gap:10px;}
+.acct-fold p{font-size:11.5px;color:var(--subtle);line-height:1.5;max-width:46ch;}
 .sync-badge{
   position:fixed;bottom:22px;left:16px;z-index:50;
   font-size:10px;font-weight:200;letter-spacing:0.1em;text-transform:uppercase;
@@ -1192,7 +1218,7 @@ en:{
   notice_too_large:"A plan that long is better handled by our own algorithm than by the AI coach — so that is what this one is.",
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
   share_plan:"Share this plan", export_ical:"Add to calendar (.ics)",
-  auth_save_title:"Keep this plan safe", auth_save_body:"It only lives in this browser. Sign in and it is backed up too.",
+  auth_save_title:"Keep this plan safe", auth_save_body:"It only lives in this browser. Sign in and it is backed up too.", acct_section:"Account",
   auth_email_ph:"you@email.com", auth_send:"Send sign-in link", auth_sent:"Check your inbox.",
   auth_failed:"Could not send the link. Try again.", auth_signout:"Sign out", auth_signed_in:"Signed in as {email}",
   auth_consent:"Your address is used for one thing: sending you a sign-in link. Your plans and progress are stored so you can get them back. Nothing else, and no marketing.",
@@ -1354,7 +1380,7 @@ da:{
   notice_too_large:"Så lang en plan laver vores egen algoritme bedre end AI-coachen — så det er den, du får her.",
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
   share_plan:"Del denne plan", export_ical:"Læg i kalender (.ics)",
-  auth_save_title:"Gem din plan", auth_save_body:"Den ligger kun i denne browser. Log ind, så gemmes den også i skyen.",
+  auth_save_title:"Gem din plan", auth_save_body:"Den ligger kun i denne browser. Log ind, så gemmes den også i skyen.", acct_section:"Konto",
   auth_email_ph:"din@email.dk", auth_send:"Send login-link", auth_sent:"Tjek din indbakke.",
   auth_failed:"Linket kunne ikke sendes. Prøv igen.", auth_signout:"Log ud", auth_signed_in:"Logget ind som {email}",
   auth_consent:"Din adresse bruges til én ting: at sende dig et login-link. Dine planer og din fremdrift gemmes, så du kan få dem igen. Ikke andet, og ingen markedsføring.",
@@ -2040,22 +2066,12 @@ async function signOut(){
 // has seen the app work and has something to lose. Dismissing it is permanent
 // until they go looking — a backup nobody switches on protects nobody, but
 // nagging is worse.
-function authBoxHtml(){
-  if(!sb)return "";
-  if(state.session){
-    const email=(state.session.user&&state.session.user.email)||"";
-    return `<div class="auth-box">
-      <div class="auth-who">${t("auth_signed_in",{email:email})}</div>
-      <div class="auth-row">
-        <button class="btn btn-outline" id="authOut">${t("auth_signout")}</button>
-        <button class="btn-danger" id="authDelete">${t("auth_delete")}</button>
-      </div>
-      <div class="auth-consent">${t("auth_delete_note")}</div>
-    </div>`;
-  }
-  if(localStorage.getItem("authDismissed"))return "";
+// The sign-in box. Dismissible where it is a nudge (the plan view, after you
+// have made something worth keeping) and permanent where it is the way in (the
+// profile foot).
+function signInBoxHtml(dismissible){
   return `<div class="auth-box">
-    <button class="auth-dismiss" id="authDismiss" aria-label="${t("auth_send")}">&times;</button>
+    ${dismissible?`<button class="auth-dismiss" id="authDismiss" aria-label="${t("auth_send")}">&times;</button>`:""}
     <div class="auth-title">${t("auth_save_title")}</div>
     <div class="auth-body">${t("auth_save_body")}</div>
     <div class="auth-row">
@@ -2063,6 +2079,44 @@ function authBoxHtml(){
       <button class="btn btn-outline" id="authSend">${t("auth_send")}</button>
     </div>
     <div class="auth-consent">${t("auth_consent")} <a href="/privacy" target="_blank" rel="noopener">${t("auth_privacy")}</a></div>
+  </div>`;
+}
+
+// What the plan view shows. Signed out it is the Task 8 nudge, kept here on
+// purpose: the moment you have a plan is the moment an account is worth
+// something, and that moment happens in the plan view, not on the profile.
+// Signed in it renders nothing — the account controls have a home now.
+function authBoxHtml(){
+  if(!sb)return "";
+  if(state.session)return "";
+  if(localStorage.getItem("authDismissed"))return "";
+  return signInBoxHtml(true);
+}
+
+// The profile foot. Signed in: who you are, whether the cloud has it, and the
+// way out. Deleting the account is irreversible and takes every plan in the
+// cloud with it, so it sits behind a fold rather than next to your training
+// plans — and behind wireAuthBox's two-click arm on top of that.
+function accountFootHtml(){
+  if(!sb)return "";
+  if(!state.session)return signInBoxHtml(false);
+  const email=(state.session.user&&state.session.user.email)||"";
+  const sync=t(state.syncState==="saved"?"sync_saved":state.syncState==="saving"?"sync_saving":"sync_pending");
+  return `<div class="acct">
+    <div class="acct-line">
+      <span>${email}</span>
+      <span class="acct-sync">${sync}</span>
+    </div>
+    <div class="acct-actions">
+      <button class="btn-danger" id="authOut">${t("auth_signout")}</button>
+    </div>
+    <details>
+      <summary>${t("acct_section")}</summary>
+      <div class="acct-fold">
+        <p>${t("auth_delete_note")}</p>
+        <div><button class="btn-danger" id="authDelete">${t("auth_delete")}</button></div>
+      </div>
+    </details>
   </div>`;
 }
 
@@ -2268,8 +2322,27 @@ async function addTombstone(id){
     return true;
   }catch(e){storageWarning(e);return false;}
 }
+// The first paint happens before the index exists. init() calls
+// renderLibrary(true) and only then awaits loadIndex(), which goes through
+// window.storage with a timeout and cannot be read synchronously. Routing the
+// landing/profile split on planIndex.length would therefore paint the hero,
+// autoplay and all, and swap a moment later: the 27 MB video would be fetched
+// anyway and the whole split would be decoration.
+//
+// So one bit, written next to every index write and read synchronously at boot.
+// It can only be wrong if storage was cleared behind our back, and then the
+// landing page is the right guess anyway.
+const PLANS_HINT_KEY="hasPlans";
+function setPlansHint(v){try{localStorage.setItem(PLANS_HINT_KEY,v?"1":"0");}catch(e){}}
+function plansHint(){try{return localStorage.getItem(PLANS_HINT_KEY)==="1";}catch(e){return false;}}
+
 async function saveIndex(idx){
-  try{await withTimeout(window.storage.set(INDEX_KEY,JSON.stringify(idx),false),STORAGE_TIMEOUT_MS,null);markLocalWrite();return true;}
+  try{
+    await withTimeout(window.storage.set(INDEX_KEY,JSON.stringify(idx),false),STORAGE_TIMEOUT_MS,null);
+    markLocalWrite();
+    setPlansHint(idx.length>0);
+    return true;
+  }
   catch(e){storageWarning(e);return false;}
 }
 async function loadPlan(id){try{const r=await withTimeout(window.storage.get("plan-"+id,false),STORAGE_TIMEOUT_MS,null);return r&&r.value?JSON.parse(r.value):null;}catch(e){return null;}}
@@ -2348,14 +2421,130 @@ let state={view:"library",planIndex:[],activePlan:null,wizardSport:"cykling",wiz
 const app=document.getElementById("app");
 
 /* ---------------- LIBRARY ---------------- */
+// Two pages behind one view. The landing page sells the product; the profile is
+// where your own plans live. Which one you get is derived from whether there are
+// any plans rather than stored in state.view, so there is no fifth view to keep
+// in step, and deleting your last plan drops you back on the landing page
+// without a line of code to do it.
+//
+// What the single page cost a returning user, in order of size: 27 MB of hero
+// video fetched on the way to their own plan, a tagline selling the product to
+// someone already using it, and account controls with no home, left at the
+// bottom of one plan's PLAN tab because there was nowhere else.
 function renderLibrary(loading){
-  const idx=state.planIndex;
-  const hasPlans=!loading&&idx.length>0;
+  const any=loading?plansHint():state.planIndex.length>0;
+  if(any)renderProfile(loading);else renderLanding(loading);
+}
 
+/* ---- pieces both pages use ---- */
+
+// A shared link can be opened by someone who already has plans, so this belongs
+// on both pages, not just the landing one.
+function sharedCardHtml(){
+  return sharedPlan?`<div class="shared-card" id="sharedCard">
+      <div>
+        <div class="shared-title">${t("shared_title")}</div>
+        <div class="shared-body">${sharedPlan.label} · ${t("card_meta",{w:sharedPlan.weeks.length,s:sharedPlan.sessionsPerWeek,d:sharedPlan.startDate||""})}</div>
+      </div>
+      <div class="shared-actions">
+        <button class="btn" id="sharedImport">${t("shared_import")}</button>
+        <button class="btn btn-outline" id="sharedDismiss">${t("shared_dismiss")}</button>
+      </div>
+    </div>`:"";
+}
+
+function wireSharedCard(){
+  const sd=document.getElementById("sharedDismiss");
+  if(sd)sd.onclick=()=>{sharedPlan=null;clearShareParam();render();};
+  const si=document.getElementById("sharedImport");
+  if(si)si.onclick=async()=>{
+    si.disabled=true;
+    const src=sharedPlan;
+    // A fresh id and empty progress: an imported plan is the recipient's own
+    // from here, not a copy of someone else's log.
+    const plan={id:"p"+Date.now(),sport:src.sport,label:src.label,target:src.target,
+      weeksAvailable:src.weeks.length,sessionsPerWeek:src.sessionsPerWeek,
+      startDate:src.startDate||new Date().toISOString().slice(0,10),
+      raceDate:src.raceDate||null,createdAt:new Date().toISOString().slice(0,10),updatedAt:new Date().toISOString(),
+      generatedBy:src.generatedBy||null,fitnessLevel:src.fitnessLevel||null,importedFromShare:true,weeks:src.weeks,progress:{}};
+    await savePlan(plan);
+    state.planCache[plan.id]=plan;
+    state.planIndex.push({id:plan.id,sport:plan.sport,label:plan.label,weeksAvailable:plan.weeksAvailable,sessionsPerWeek:plan.sessionsPerWeek,createdAt:plan.createdAt});
+    await saveIndex(state.planIndex);
+    sharedPlan=null;clearShareParam();
+    state.activePlan=plan;openWeekIdx=null;planTab="today";state.view="plan";render();
+  };
+}
+
+function plansSectionHtml(loading){
+  const idx=state.planIndex;
+  if(loading)return `<div class="loading">${t("loading_plans")}</div>`;
+  if(idx.length===0)return `
+      <div class="plans-section">
+        <div class="plans-header">
+          <h2>${t("my_plans")}</h2>
+        </div>
+        <div style="padding:16px 0 0;">
+          <div class="ghost-card">
+            <div class="ghost-icon"></div>
+            <div class="ghost-lines">
+              <div class="ghost-line med"></div>
+              <div class="ghost-line short"></div>
+            </div>
+          </div>
+          <div class="empty-state">
+            <strong>${t("no_plans")}</strong>
+            ${t("no_plans_sub")}
+          </div>
+        </div>
+      </div>
+    `;
+  const cards=idx.slice().reverse().map((p,i)=>`
+      <div class="plan-card" data-id="${p.id}">
+        <div class="plan-card-num">#${String(idx.length-i).padStart(2,"0")}</div>
+        <div class="plan-card-body">
+          <div class="plan-card-sport">${SPORTS[p.sport].label}</div>
+          <div class="plan-card-title">${p.label}</div>
+          <div class="plan-card-meta">${t("card_meta",{w:p.weeksAvailable,s:p.sessionsPerWeek,d:p.createdAt})}</div>
+        </div>
+        <div class="plan-card-arrow">→</div>
+      </div>
+    `).join("");
+  return `
+      <div class="plans-section">
+        <div class="plans-header" id="plansAnchor">
+          <h2>${t("my_plans")}</h2>
+          <button class="btn-outline" id="newPlanBtn2">${t("new_plan")}</button>
+        </div>
+        ${cards}
+      </div>
+    `;
+}
+
+function wirePlanCards(){
+  const btn2=document.getElementById("newPlanBtn2");
+  if(btn2)btn2.onclick=()=>{state.view="wizard";render();};
+  app.querySelectorAll(".plan-card").forEach(el=>{
+    el.onclick=async()=>{
+      if(state.planCache[el.dataset.id]){state.activePlan=state.planCache[el.dataset.id];state.view="plan";render();return;}
+      el.style.opacity="0.5";
+      const h2=el.querySelector(".plan-card-title");
+      const orig=h2.textContent;h2.textContent="Opening…";
+      const plan=await loadPlan(el.dataset.id);
+      if(plan){state.planCache[plan.id]=plan;state.activePlan=plan;state.view="plan";render();}
+      else{el.style.opacity="1";h2.textContent=orig;}
+    };
+  });
+}
+
+/* ---- the landing page: for people who do not have a plan yet ---- */
+
+function renderLanding(loading){
+  const idx=state.planIndex;
   const tickerQuotes=[1,2,3,4,5,6,7,8,9,10].map(i=>t("tick_"+i));
   const tickerContent=tickerQuotes.map(q=>`<span class="ticker-item">${q}<span class="ticker-sep">✦</span></span>`).join("");
 
-  let heroHtml=`
+  const heroHtml=`
     <div class="ticker-wrap"><div class="ticker-track">${tickerContent}${tickerContent}</div></div>
     <div class="hero">
       <video class="hero-video" id="heroVideo" autoplay muted loop playsinline>
@@ -2390,65 +2579,6 @@ function renderLibrary(loading){
     </div>
   `;
 
-  const sharedHtml=sharedPlan?`<div class="shared-card" id="sharedCard">
-      <div>
-        <div class="shared-title">${t("shared_title")}</div>
-        <div class="shared-body">${sharedPlan.label} · ${t("card_meta",{w:sharedPlan.weeks.length,s:sharedPlan.sessionsPerWeek,d:sharedPlan.startDate||""})}</div>
-      </div>
-      <div class="shared-actions">
-        <button class="btn" id="sharedImport">${t("shared_import")}</button>
-        <button class="btn btn-outline" id="sharedDismiss">${t("shared_dismiss")}</button>
-      </div>
-    </div>`:"";
-
-  let plansHtml="";
-  if(loading){
-    plansHtml=`<div class="loading">${t("loading_plans")}</div>`;
-  } else if(idx.length===0){
-    plansHtml=`
-      <div class="plans-section">
-        <div class="plans-header">
-          <h2>${t("my_plans")}</h2>
-        </div>
-        <div style="padding:16px 0 0;">
-          <div class="ghost-card">
-            <div class="ghost-icon"></div>
-            <div class="ghost-lines">
-              <div class="ghost-line med"></div>
-              <div class="ghost-line short"></div>
-            </div>
-          </div>
-          <div class="empty-state">
-            <strong>${t("no_plans")}</strong>
-            ${t("no_plans_sub")}
-          </div>
-        </div>
-      </div>
-    `;
-  } else {
-    const cards=idx.slice().reverse().map((p,i)=>`
-      <div class="plan-card" data-id="${p.id}">
-        <div class="plan-card-num">#${String(idx.length-i).padStart(2,"0")}</div>
-        <div class="plan-card-body">
-          <div class="plan-card-sport">${SPORTS[p.sport].label}</div>
-          <div class="plan-card-title">${p.label}</div>
-          <div class="plan-card-meta">${t("card_meta",{w:p.weeksAvailable,s:p.sessionsPerWeek,d:p.createdAt})}</div>
-        </div>
-        <div class="plan-card-arrow">→</div>
-      </div>
-    `).join("");
-
-    plansHtml=`
-      <div class="plans-section">
-        <div class="plans-header" id="plansAnchor">
-          <h2>${t("my_plans")}</h2>
-          <button class="btn-outline" id="newPlanBtn2">${t("new_plan")}</button>
-        </div>
-        ${cards}
-      </div>
-    `;
-  }
-
   const howHtml=loading?"":`
     <details class="how-dropdown" ${idx.length===0?"open":""}>
       <summary class="how-toggle"><h2>${t("how_it_works")}</h2></summary>
@@ -2469,30 +2599,16 @@ function renderLibrary(loading){
     </details>
   `;
 
-  app.innerHTML=sharedHtml+heroHtml+plansHtml+howHtml;
+  app.innerHTML=sharedCardHtml()+heroHtml+plansSectionHtml(loading)+howHtml;
 
-  const sd=document.getElementById("sharedDismiss");
-  if(sd)sd.onclick=()=>{sharedPlan=null;clearShareParam();render();};
-  const si=document.getElementById("sharedImport");
-  if(si)si.onclick=async()=>{
-    si.disabled=true;
-    const src=sharedPlan;
-    // A fresh id and empty progress: an imported plan is the recipient's own
-    // from here, not a copy of someone else's log.
-    const plan={id:"p"+Date.now(),sport:src.sport,label:src.label,target:src.target,
-      weeksAvailable:src.weeks.length,sessionsPerWeek:src.sessionsPerWeek,
-      startDate:src.startDate||new Date().toISOString().slice(0,10),
-      raceDate:src.raceDate||null,createdAt:new Date().toISOString().slice(0,10),updatedAt:new Date().toISOString(),
-      generatedBy:src.generatedBy||null,fitnessLevel:src.fitnessLevel||null,importedFromShare:true,weeks:src.weeks,progress:{}};
-    await savePlan(plan);
-    state.planCache[plan.id]=plan;
-    state.planIndex.push({id:plan.id,sport:plan.sport,label:plan.label,weeksAvailable:plan.weeksAvailable,sessionsPerWeek:plan.sessionsPerWeek,createdAt:plan.createdAt});
-    await saveIndex(state.planIndex);
-    sharedPlan=null;clearShareParam();
-    state.activePlan=plan;openWeekIdx=null;planTab="today";state.view="plan";render();
-  };
+  wireSharedCard();
 
-  document.getElementById("newPlanBtn").onclick=()=>{state.view="wizard";render();};
+  // Guarded, unlike before. The old code reached for newPlanBtn unconditionally
+  // because the hero was always in the DOM; on the profile it is not, and an
+  // unguarded lookup there would throw on every render.
+  const np=document.getElementById("newPlanBtn");
+  if(np)np.onclick=()=>{state.view="wizard";render();};
+
   const heroVideo=document.getElementById("heroVideo");
   const heroVideoToggle=document.getElementById("heroVideoToggle");
   const heroFallbackImg=document.getElementById("heroFallbackImg");
@@ -2517,22 +2633,36 @@ function renderLibrary(loading){
     heroVideo.addEventListener("error",showFallback);
     setTimeout(showFallback,10000);
   }
-  const btn2=document.getElementById("newPlanBtn2");
-  if(btn2) btn2.onclick=()=>{state.view="wizard";render();};
-  const scrollBtn=document.getElementById("scrollToPlans");
-  if(scrollBtn) scrollBtn.onclick=()=>document.getElementById("plansAnchor")?.scrollIntoView({behavior:"smooth"});
 
-  app.querySelectorAll(".plan-card").forEach(el=>{
-    el.onclick=async()=>{
-      if(state.planCache[el.dataset.id]){state.activePlan=state.planCache[el.dataset.id];state.view="plan";render();return;}
-      el.style.opacity="0.5";
-      const h2=el.querySelector(".plan-card-title");
-      const orig=h2.textContent;h2.textContent="Opening…";
-      const plan=await loadPlan(el.dataset.id);
-      if(plan){state.planCache[plan.id]=plan;state.activePlan=plan;state.view="plan";render();}
-      else{el.style.opacity="1";h2.textContent=orig;}
-    };
-  });
+  wirePlanCards();
+}
+
+/* ---- the profile: for people who have one ---- */
+
+function renderProfile(loading){
+  // The hero carried the only wordmark in the app, and the hero is not here, so
+  // the page would otherwise open with no name on it.
+  const topHtml=`
+    <div class="profile-top">
+      <div class="profile-top-icon">
+        <svg viewBox="0 0 16 16"><polyline points="2,11 5,7 8,9 11,5 14,7"/></svg>
+      </div>
+      <span class="profile-top-text">Range Finder</span>
+    </div>
+  `;
+
+  // No hero, no ticker, no proof strip, no how-it-works. Not hidden with CSS:
+  // never built, so hero-video.mp4 is never requested. That is the difference
+  // between the 27 MB being saved and the page only looking like it saved them.
+  //
+  // The account foot waits for the load to finish, because state.session is
+  // hydrated after the first paint and a foot rendered too early would show the
+  // sign-in box to someone who is already signed in.
+  app.innerHTML=sharedCardHtml()+topHtml+plansSectionHtml(loading)+(loading?"":accountFootHtml());
+
+  wireSharedCard();
+  wirePlanCards();
+  wireAuthBox();
 }
 
 /* ---------------- WIZARD ---------------- */
@@ -3537,6 +3667,9 @@ function render(){
   // and that immediately triggers a sync.
   sharedPlan=await readSharedPlan();
   state.planIndex=await loadIndex();
+  // Seeds the hint for anyone whose plans predate it, so their second visit
+  // lands on the profile instead of paying for the hero video once more.
+  setPlansHint(state.planIndex.length>0);
   libraryReady=true;
   if(state.view==="library")renderLibrary(false);
 
