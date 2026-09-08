@@ -1,5 +1,5 @@
 # Range Finder — Handoff
-Sidst opdateret: 2026-09-08 (2)
+Sidst opdateret: 2026-09-08 (3)
 
 ## Hvad det er
 
@@ -27,7 +27,7 @@ En træningsplan-app til cykling, løb og svømning. Brugeren angiver sport, må
 | Privatlivspolitik | live på `/privacy`, med rigtige selskabsoplysninger |
 | Slet min konto | virker, verificeret: 204 og rækken væk via cascade |
 | Skrifttyper | selvhostet, ingen Google i anmodningskæden |
-| Profilside | virker, verificeret i browseren: `hero-video.mp4` optræder **ikke** i resource-timelinen |
+| Profilside | virker, verificeret i produktion: intet element der kan hente hero-videoen |
 | Adgangskode-login | bygget, magic link beholdt som alternativ. Aktivering kræver stadig mail |
 | Kopiér til Strava | virker, teksten er byte-identisk med `.ics`-beskrivelsen |
 | Opbevaringsregel (12 mdr.) | databasen verificeret 7/7, endpointet deployet og verificeret — **mangler `CRON_SECRET` og Resend**, se nedenfor |
@@ -219,13 +219,27 @@ Den vigtigste lektie er ikke fejlene, men at **gaten skjulte den første.** Alle
 
 Supabases indbyggede mailserver sender **kun til medlemmer af projektets egen organisation**, med et loft på 2 i timen. Magic link virker derfor perfekt når du tester på dig selv og fejler for hver rigtig bruger, med `Email address not authorized` og ingen synlig fejl i appen. Custom SMTP via Resend er ikke valgfrit. Kilde: supabase.com/docs/guides/auth/auth-smtp.
 
+### Deployet 2026-09-08, målt mod produktion
+
+Alle statiske filer svarer 200 med rigtig content-type efter at de eksplicitte ruter blev fjernet til fordel for `handle: filesystem`: `/`, `/privacy`, `/logo.png`, `/icon.svg`, `/hero-fallback.jpg`, `/fonts/*.woff2`. **`/_vercel/insights/script.js` svarer 200 `application/javascript`, 3106 bytes** — uændret, så analytics-stien overlevede omskrivningen. `/api/retention-warn` giver 401, `/api/generate` med tom body giver 400. Nul fejlede requests i resource-timelinen på en frisk indlæsning.
+
 ### Profilsiden hviler på ét bit i localStorage
 
 `init()` kalder `renderLibrary(true)` **før** `await loadIndex()`, og indekset går gennem `window.storage` med timeout — det kan ikke læses synkront. Rutede man landing/profil på `planIndex.length`, tegnede første paint hero'en med `<video autoplay>` og skiftede et øjeblik efter. De 27 MB blev hentet alligevel, og hele splittet var pynt.
 
 Derfor `hasPlans` i localStorage, skrevet ved siden af hver indeks-skrivning i `saveIndex()` og seedet i `init()` for planer der er ældre end bittet.
 
-**Verifikationen er en måling, ikke et øjekast:** `performance.getEntriesByType("resource")` må ikke indeholde `hero-video.mp4` når der er planer. Målt 2026-09-08: den gør den ikke. At `#heroVideo` er `null` er ikke nok at tjekke alene — det er målingen der siger at bytes ikke blev hentet.
+**Verificér strukturelt, ikke med resource-timelinen.** Det oplagte er at måle at `hero-video.mp4` ikke optræder i `performance.getEntriesByType("resource")`. Det gjorde jeg, og det er en dårlig gate: den læser også 0 på *salgsforsiden*, hvor videoen beviseligt er der, hvis man måler før siden er faldet til ro. Videoen dukker først op i timelinen efter et stykke tid, som tre range requests. Et fravær beviser altså ingenting uden en positiv kontrol der faktisk udløses, og jeg fik ikke den kontrol til at være pålidelig inden for et par sekunder.
+
+Den holdbare påstand er at browseren ikke har noget at hente med. Målt i produktion 2026-09-08 på profilsiden:
+
+```js
+!!document.getElementById("heroVideo")              // false
+!!document.querySelector("source[src*=hero-video]") // false
+!!document.getElementById("heroFallbackImg")        // false
+```
+
+Ingen af de tre findes, så der er intet element der kan udløse en request. Det tager også `hero-fallback.jpg` med, yderligere 284 KB. Bemærk at `document.documentElement.innerHTML.includes("hero-video.mp4")` er `true` uanset — det er `renderLanding`s kildetekst i det inline script, ikke en request.
 
 ### `openPhaseKey` er visningsnavnet, ikke `phaseKey`
 
