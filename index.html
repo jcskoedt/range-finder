@@ -779,6 +779,16 @@ body{
 }
 .auth-who{font-size:12px;color:var(--subtle);}
 .auth-consent{font-size:11.5px;color:var(--subtle);line-height:1.5;max-width:46ch;}
+.auth-or{
+  font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--subtle);
+  text-align:center;font-weight:600;
+}
+.auth-hint{font-size:12.5px;line-height:1.5;max-width:46ch;color:var(--text);}
+.auth-hint:empty{display:none;}
+.auth-row input[type=password]{
+  font-family:'Inter',sans-serif;font-size:14px;padding:11px 12px;
+  border:2px solid var(--border);min-height:44px;flex:1;min-width:180px;border-radius:0;
+}
 
 /* The profile page. The hero used to carry the wordmark; without it the page
    would open with no name on it. */
@@ -1228,6 +1238,14 @@ en:{
   notice_fallback:"AI coach temporarily unavailable — here's your plan from our algorithm.",
   share_plan:"Share this plan", export_ical:"Add to calendar (.ics)", copy_desc:"Copy for Strava", copy_done:"Copied", copy_failed:"Could not copy",
   auth_save_title:"Keep this plan safe", auth_save_body:"It only lives in this browser. Sign in and it is backed up too.", acct_section:"Account",
+  auth_pass_ph:"Password (min. 8 characters)",
+  auth_login:"Sign in", auth_signup:"Create account", auth_or:"or",
+  auth_link_instead:"Send me a sign-in link instead",
+  auth_need_both:"Fill in both fields.", auth_need_email:"Enter your email first.",
+  auth_pass_short:"Use at least 8 characters.",
+  auth_check_mail:"Almost there. Open the mail we just sent, confirm your address, then sign in here.",
+  auth_unconfirmed:"This account is not activated yet. Open the confirmation mail first.",
+  auth_bad_creds:"Wrong email or password.",
   empty_cloud_title:"Nothing in this browser yet",
   empty_cloud_body:"You are signed in, but there are no plans here. If you made one in another browser it is still there, untouched — open the app in that browser and sign in, and it syncs from there. Mail apps open links in a browser of their own, which is not the one you were using.",
   auth_email_ph:"you@email.com", auth_send:"Send sign-in link", auth_sent:"Check your inbox.",
@@ -1392,6 +1410,14 @@ da:{
   notice_fallback:"AI-coach midlertidigt utilgængelig — her er din plan baseret på vores algoritme.",
   share_plan:"Del denne plan", export_ical:"Læg i kalender (.ics)", copy_desc:"Kopiér til Strava", copy_done:"Kopieret", copy_failed:"Kunne ikke kopiere",
   auth_save_title:"Gem din plan", auth_save_body:"Den ligger kun i denne browser. Log ind, så gemmes den også i skyen.", acct_section:"Konto",
+  auth_pass_ph:"Adgangskode (min. 8 tegn)",
+  auth_login:"Log ind", auth_signup:"Opret konto", auth_or:"eller",
+  auth_link_instead:"Send mig et login-link i stedet",
+  auth_need_both:"Udfyld begge felter.", auth_need_email:"Skriv din email først.",
+  auth_pass_short:"Brug mindst 8 tegn.",
+  auth_check_mail:"Næsten. Åbn mailen vi lige har sendt, bekræft din adresse, og log så ind her.",
+  auth_unconfirmed:"Kontoen er ikke aktiveret endnu. Åbn bekræftelsesmailen først.",
+  auth_bad_creds:"Forkert email eller adgangskode.",
   empty_cloud_title:"Der er ikke noget i denne browser endnu",
   empty_cloud_body:"Du er logget ind, men der ligger ingen planer her. Lavede du en i en anden browser, ligger den der stadig og er urørt — åbn appen der og log ind, så synkroniseres den derfra. Mail-apps åbner links i deres egen browser, og det er ikke den du sad i.",
   auth_email_ph:"din@email.dk", auth_send:"Send login-link", auth_sent:"Tjek din indbakke.",
@@ -2087,6 +2113,45 @@ async function signIn(email){
   }catch(e){console.warn("[auth] "+e);return false;}
 }
 
+// Password sign-in. This is the one that fixes the magic-link trap: it happens
+// in the browser the athlete is already sitting in, so the session and the
+// plans cannot end up in two different localStorages.
+//
+// Supabase's error string is the only signal for why it failed, and it is worth
+// branching on the two cases a user can act on: the account exists but was
+// never activated, and the password is wrong. Everything else is one message.
+async function signInPassword(email,password){
+  if(!sb)return "failed";
+  try{
+    const {error}=await sb.auth.signInWithPassword({email,password});
+    if(!error)return "ok";
+    console.warn("[auth] signin: "+error.message);
+    return (error.message||"").toLowerCase().includes("not confirmed")?"unconfirmed":"bad_credentials";
+  }catch(e){console.warn("[auth] "+e);return "failed";}
+}
+
+// Confirmation is required on this project - Jacob's call, 2026-09-08: an
+// account is not active until the address is approved. So a successful signUp
+// returns a user and NO session, and the honest thing to say is "go and open
+// the mail". If a session does come back, confirmation was switched off and the
+// athlete is simply in.
+//
+// The result is deliberately not used to tell the user whether the address
+// already exists. Supabase blurs that on purpose to stop address enumeration,
+// and repeating the blur beats guessing wrong.
+async function signUpPassword(email,password){
+  if(!sb)return "failed";
+  try{
+    const {data,error}=await sb.auth.signUp({email,password,
+      options:{emailRedirectTo:location.origin+location.pathname}});
+    if(error){
+      console.warn("[auth] signup: "+error.message);
+      return (error.message||"").toLowerCase().includes("password")?"weak_password":"failed";
+    }
+    return (data&&data.session)?"ok":"check_mail";
+  }catch(e){console.warn("[auth] "+e);return "failed";}
+}
+
 // Signing out stops the backup and leaves the library where it is. On a shared
 // computer that means the plans stay behind — a deliberate trade in favour of
 // not losing training, decided in the design conversation.
@@ -2110,8 +2175,19 @@ function signInBoxHtml(dismissible){
     <div class="auth-body">${t("auth_save_body")}</div>
     <div class="auth-row">
       <input type="email" id="authEmail" placeholder="${t("auth_email_ph")}" autocomplete="email">
-      <button class="btn btn-outline" id="authSend">${t("auth_send")}</button>
     </div>
+    <div class="auth-row">
+      <input type="password" id="authPass" placeholder="${t("auth_pass_ph")}" autocomplete="current-password">
+    </div>
+    <div class="auth-row">
+      <button class="btn" id="authLogin">${t("auth_login")}</button>
+      <button class="btn btn-outline" id="authSignup">${t("auth_signup")}</button>
+    </div>
+    <div class="auth-or">${t("auth_or")}</div>
+    <div class="auth-row">
+      <button class="btn btn-outline" id="authSend" style="flex:1">${t("auth_link_instead")}</button>
+    </div>
+    <div class="auth-hint" id="authHint" aria-live="polite"></div>
     <div class="auth-consent">${t("auth_consent")} <a href="/privacy" target="_blank" rel="noopener">${t("auth_privacy")}</a></div>
   </div>`;
 }
@@ -2157,15 +2233,47 @@ function accountFootHtml(){
 // Markup without wiring has shipped in this project before and nobody noticed
 // for days, so these are wired in the same function that renders the tab.
 function wireAuthBox(){
+  // A hint line rather than alertInline: these are sentences, not button
+  // labels, and "open the mail and confirm your address" does not fit inside a
+  // button the way "Copied" does.
+  const hint=(msg)=>{const h=document.getElementById("authHint");if(h)h.textContent=msg;};
+  const creds=()=>{
+    const e=document.getElementById("authEmail"),pw=document.getElementById("authPass");
+    return {email:(e&&e.value||"").trim(),password:(pw&&pw.value||"")};
+  };
+
+  const login=document.getElementById("authLogin");
+  if(login)login.onclick=async()=>{
+    const {email,password}=creds();
+    if(!email||!password){hint(t("auth_need_both"));return;}
+    login.disabled=true;hint("");
+    const r=await signInPassword(email,password);
+    login.disabled=false;
+    // "ok" needs no message: onAuthStateChange re-renders and starts the sync.
+    if(r==="ok")return;
+    hint(r==="unconfirmed"?t("auth_unconfirmed"):r==="bad_credentials"?t("auth_bad_creds"):t("auth_failed"));
+  };
+
+  const signup=document.getElementById("authSignup");
+  if(signup)signup.onclick=async()=>{
+    const {email,password}=creds();
+    if(!email||!password){hint(t("auth_need_both"));return;}
+    if(password.length<8){hint(t("auth_pass_short"));return;}
+    signup.disabled=true;hint("");
+    const r=await signUpPassword(email,password);
+    signup.disabled=false;
+    if(r==="ok")return;
+    hint(r==="check_mail"?t("auth_check_mail"):r==="weak_password"?t("auth_pass_short"):t("auth_failed"));
+  };
+
   const send=document.getElementById("authSend");
   if(send)send.onclick=async()=>{
-    const el=document.getElementById("authEmail");
-    const email=(el&&el.value||"").trim();
-    if(!email)return;
-    send.disabled=true;
+    const {email}=creds();
+    if(!email){hint(t("auth_need_email"));return;}
+    send.disabled=true;hint("");
     const ok=await signIn(email);
     send.disabled=false;
-    alertInline("authSend",ok?t("auth_sent"):t("auth_failed"));
+    hint(ok?t("auth_sent"):t("auth_failed"));
   };
   const dismiss=document.getElementById("authDismiss");
   if(dismiss)dismiss.onclick=()=>{try{localStorage.setItem("authDismissed","1");}catch(e){}render();};
